@@ -101,6 +101,13 @@ public class SniperWeapon : MonoBehaviour
     public int MaxAmmo => maxAmmo;
     public int ReserveAmmo => reserveAmmo;
 
+    private bool IsEquippedByPlayer()
+    {
+        if (!gameObject.activeInHierarchy || !enabled) return false;
+        if (transform.parent == null) return false;
+        return GetComponentInParent<CharacterController>() != null || GetComponentInParent<WeaponSwitcher>() != null;
+    }
+
     public void AddReserveAmmo(int amount)
     {
         reserveAmmo += amount;
@@ -155,6 +162,15 @@ public class SniperWeapon : MonoBehaviour
 
     private void Update()
     {
+        if (!IsEquippedByPlayer())
+        {
+            isReloading = false;
+            isCocking = false;
+            isRecoiling = false;
+            ResetZoomState();
+            return;
+        }
+
         HandleZoomInput();
 
         if (mainCam != null)
@@ -310,6 +326,8 @@ public class SniperWeapon : MonoBehaviour
 
     private void Shoot()
     {
+        if (!IsEquippedByPlayer()) return;
+
         currentAmmo--;
 
         if (shootAudioSource != null && shootAudioClip != null)

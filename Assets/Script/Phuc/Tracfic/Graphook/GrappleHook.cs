@@ -207,6 +207,13 @@ public class GrappleHook : MonoBehaviour
     public bool IsSwingingOrPulling => isGrappling && isHookAttached;
     public float RemainingCooldown => Mathf.Max(0f, (lastGrappleTime + cooldown) - Time.time);
 
+    private bool IsEquippedByPlayer()
+    {
+        if (!gameObject.activeInHierarchy || !enabled) return false;
+        if (transform.parent == null) return false;
+        return GetComponentInParent<CharacterController>() != null || GetComponentInParent<WeaponSwitcher>() != null;
+    }
+
     public string CurrentStateLabel
     {
         get
@@ -468,6 +475,15 @@ public class GrappleHook : MonoBehaviour
 
     private void Update()
     {
+        if (!IsEquippedByPlayer())
+        {
+            if (isGrappling)
+            {
+                ReleaseGrapple(playSound: false);
+            }
+            return;
+        }
+
         ActiveGrappleAction?.Enable();
         ActiveMoveAction?.Enable();
         ActivePullToStandAction?.Enable();
@@ -599,6 +615,8 @@ public class GrappleHook : MonoBehaviour
 
     private void TryStartGrapple()
     {
+        if (!IsEquippedByPlayer()) return;
+
         if (controller == null || !controller.enabled)
         {
             AutoFindAndBindComponents();

@@ -78,6 +78,13 @@ public class WeaponSystem : MonoBehaviour
     public int ReserveAmmo => reserveAmmo; // Truyền ra ngoài nếu cần làm UI hiển thị đạn dự phòng
     public WeaponType CurrentWeaponType => weaponType;
 
+    private bool IsEquippedByPlayer()
+    {
+        if (!gameObject.activeInHierarchy || !enabled) return false;
+        if (transform.parent == null) return false;
+        return GetComponentInParent<CharacterController>() != null || GetComponentInParent<WeaponSwitcher>() != null;
+    }
+
     public void ToggleWeaponMode()
     {
         weaponType = (weaponType == WeaponType.FullAuto) ? WeaponType.SemiAuto : WeaponType.FullAuto;
@@ -121,6 +128,12 @@ public class WeaponSystem : MonoBehaviour
 
     private void Update()
     {
+        if (!IsEquippedByPlayer())
+        {
+            isReloading = false;
+            return;
+        }
+
         if (isReloading)
         {
             reloadTimer -= Time.deltaTime;
@@ -189,6 +202,8 @@ public class WeaponSystem : MonoBehaviour
 
     private void Shoot()
     {
+        if (!IsEquippedByPlayer()) return;
+
         currentAmmo--;
 
         if (cameraRecoilRef != null)

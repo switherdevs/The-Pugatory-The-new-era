@@ -77,6 +77,13 @@ public class MeleeWeapon : MonoBehaviour
     private HashSet<Collider> hitCollidersInCurrentSwing = new HashSet<Collider>();
     private bool hasPlayedImpactAudioThisSwing = false;
 
+    private bool IsEquippedByPlayer()
+    {
+        if (!gameObject.activeInHierarchy || !enabled) return false;
+        if (transform.parent == null) return false;
+        return GetComponentInParent<CharacterController>() != null || GetComponentInParent<WeaponSwitcher>() != null;
+    }
+
     private void Awake()
     {
         originalLocalRotation = transform.localRotation;
@@ -111,6 +118,15 @@ public class MeleeWeapon : MonoBehaviour
 
     private void Update()
     {
+        if (!IsEquippedByPlayer())
+        {
+            isAttacking = false;
+            returningToOriginal = false;
+            attackBuffer = false;
+            currentSweepY = 0f;
+            return;
+        }
+
         bool isAttackInput = attackAction != null && attackAction.action.triggered;
 
         // Lưu lại tín hiệu bấm đánh (Attack Buffer) nếu người chơi bấm trong lúc kiếm đang thu về
@@ -146,6 +162,13 @@ public class MeleeWeapon : MonoBehaviour
         float progress = 0f;
         while (progress < 1f)
         {
+            if (!IsEquippedByPlayer())
+            {
+                isAttacking = false;
+                returningToOriginal = false;
+                yield break;
+            }
+
             progress += Time.deltaTime * attackSpeed;
             float t = Mathf.Sin(progress * Mathf.PI * 0.5f);
             currentSweepY = Mathf.Lerp(-sweepRangeY, sweepRangeY, t);
@@ -166,6 +189,12 @@ public class MeleeWeapon : MonoBehaviour
 
         while (returningToOriginal)
         {
+            if (!IsEquippedByPlayer())
+            {
+                returningToOriginal = false;
+                yield break;
+            }
+
             currentSweepY = Mathf.Lerp(currentSweepY, 0f, returnSpeed * Time.deltaTime);
 
             if (Mathf.Abs(currentSweepY) < 0.1f)
