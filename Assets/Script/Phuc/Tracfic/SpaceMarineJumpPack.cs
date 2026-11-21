@@ -18,6 +18,8 @@ public class SpaceMarineJumpPack : MonoBehaviour
     [Header("Script & Camera Integration")]
     [Tooltip("Script di chuyển mặt đất sẽ tạm tắt khi dùng Jump Pack trên không.")]
     [SerializeField] private IronStormMovement movementScript;
+    [Tooltip("Script súng móc để nhường điều khiển khi đang đu dây hoặc kéo lên cột.")]
+    [SerializeField] private GrappleHook grappleHookScript;
     [Tooltip("Script Camera để rung cam và tăng FOV khi bay.")]
     [SerializeField] private IronStormCamera cameraScript;
     [Tooltip("Transform dùng làm hệ quy chiếu hướng tới/sang ngang khi bay (để trống sẽ ưu tiên Camera.main hoặc chính object này).")]
@@ -91,6 +93,8 @@ public class SpaceMarineJumpPack : MonoBehaviour
     private InputAction runtimeBoostAction;
     private bool usingFallbackActions = false;
 
+    public bool IsJumpPackActive => isJumpPackActive;
+
     private InputAction ActiveToggleAction => toggleJumpPackAction != null && toggleJumpPackAction.action != null ? toggleJumpPackAction.action : runtimeToggleAction;
     private InputAction ActiveHoverAction => sustainHoverAction != null && sustainHoverAction.action != null ? sustainHoverAction.action : runtimeHoverAction;
     private InputAction ActiveMoveAction => moveAction != null && moveAction.action != null ? moveAction.action : runtimeMoveAction;
@@ -103,6 +107,11 @@ public class SpaceMarineJumpPack : MonoBehaviour
         if (movementScript == null)
         {
             movementScript = GetComponent<IronStormMovement>();
+        }
+
+        if (grappleHookScript == null)
+        {
+            grappleHookScript = GetComponentInChildren<GrappleHook>(true);
         }
 
         if (cameraScript == null)
@@ -160,6 +169,10 @@ public class SpaceMarineJumpPack : MonoBehaviour
 
     private void OnEnable()
     {
+        if (grappleHookScript == null)
+        {
+            grappleHookScript = GetComponentInChildren<GrappleHook>(true);
+        }
         EnableAllActions();
     }
 
@@ -247,6 +260,18 @@ public class SpaceMarineJumpPack : MonoBehaviour
             hasUsedJumpPackInAir = false;
         }
 
+        // Nếu đang thực sự đu hoặc kéo dây móc thì nhường quyền điều khiển cho GrappleHook
+        bool đangDuHoacKeoDay = grappleHookScript != null && grappleHookScript.IsSwingingOrPulling;
+        if (đangDuHoacKeoDay)
+        {
+            if (isJumpPackActive)
+            {
+                DeactivateJumpPack();
+            }
+            UpdateUI();
+            return;
+        }
+
         if (isJumpPackActive)
         {
             if (movementScript != null && movementScript.enabled)
@@ -254,7 +279,6 @@ public class SpaceMarineJumpPack : MonoBehaviour
                 movementScript.enabled = false;
             }
 
-            // Đang bay: nhấn C để hủy bay ngay
             if (WasLaunchKeyPressed())
             {
                 DeactivateJumpPack();
@@ -295,18 +319,15 @@ public class SpaceMarineJumpPack : MonoBehaviour
     {
         if (!WasLaunchKeyPressed()) return;
 
-        // Đã dùng C trong lượt nhảy/bay này rồi thì không thể kích hoạt lại cho tới khi chạm đất
         if (hasUsedJumpPackInAir || currentEnergy <= 2f)
         {
             return;
         }
 
-        // Nhấn C từ mặt đất để phóng cao lên (chưa giữ bay)
         if (IsGroundedSafe())
         {
             ActivateJumpPack(launchUpSpeed);
         }
-        // Nhảy thường bằng Space lên rồi nhấn C -> vẫn bay lên được (chưa giữ bay)
         else
         {
             ActivateJumpPack(midAirBoostUpSpeed);
@@ -317,7 +338,6 @@ public class SpaceMarineJumpPack : MonoBehaviour
     {
         isJumpPackActive = true;
         hasUsedJumpPackInAir = true;
-        // Nhấn C chỉ phóng lên, chưa giữ bay cho đến khi bấm Space
         isHovering = false;
         isBoosting = false;
         hoverTimer = 0f;
@@ -359,7 +379,6 @@ public class SpaceMarineJumpPack : MonoBehaviour
 
     private void UpdateFlightStates()
     {
-        // Bấm Space 1 cái khi đang bay để bật/tắt trạng thái giữ bay
         if (WasSpacePressed())
         {
             if (!isHovering && currentEnergy > 0.2f)

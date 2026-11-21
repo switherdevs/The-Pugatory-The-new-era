@@ -9,7 +9,7 @@ GameObject:
   serializedVersion: 6
   m_Component:
   - component: {fileID: 5293205312425674427}
-  m_Layer: 7
+  m_Layer: 0
   m_Name: End
   m_TagString: Untagged
   m_Icon: {fileID: 0}
@@ -379,7 +379,6 @@ GameObject:
   m_Component:
   - component: {fileID: 6120820107297739640}
   - component: {fileID: 2671973552140536834}
-  - component: {fileID: 2310808715162661921}
   - component: {fileID: 6504549119277413634}
   - component: {fileID: 3649004748418422021}
   m_Layer: 0
@@ -460,14 +459,6 @@ Camera:
   m_OcclusionCulling: 1
   m_StereoConvergence: 10
   m_StereoSeparation: 0.022
---- !u!81 &2310808715162661921
-AudioListener:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 4317670434159137578}
-  m_Enabled: 1
 --- !u!114 &6504549119277413634
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -565,7 +556,7 @@ GameObject:
   serializedVersion: 6
   m_Component:
   - component: {fileID: 6365804242457185568}
-  m_Layer: 7
+  m_Layer: 0
   m_Name: Start
   m_TagString: Untagged
   m_Icon: {fileID: 0}
@@ -968,6 +959,8 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 540385794a7b2cd4f9cd1b6782a340e5, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::GrappleHook
+  weaponDisplayName: Grapple Hook
+  jumpPackScript: {fileID: 4864456756849798777}
   grappleAction: {fileID: -6420940206987871999, guid: 052faaac586de48259a63d0c4782560b, type: 3}
   moveAction: {fileID: -1680190386980627800, guid: 052faaac586de48259a63d0c4782560b, type: 3}
   pullToStandAction: {fileID: 1781555164194001046, guid: 052faaac586de48259a63d0c4782560b, type: 3}
@@ -976,7 +969,10 @@ MonoBehaviour:
     m_Bits: 512
   requiredTag: 
   maxGrappleDistance: 150
+  aimAssistRadius: 1.35
   suspendRopeLength: 6
+  minHangBelowAnchor: 1.5
+  maxUpwardSwingSpeed: 4.5
   pendulumGravity: 22
   ropeTensionStiffness: 35
   enableSwingPhysics: 1
@@ -984,13 +980,19 @@ MonoBehaviour:
   swingFrequency: 2.4
   swingDamping: 2.5
   playerSwingControl: 8
+  maxDirectionalSwingSpeed: 16
+  maxSwingAngle: 62
+  reverseSwingMomentum: 0.78
+  earlyVaultDistance: 6.5
+  vaultJumpUpSpeed: 13.5
+  vaultHorizontalPullSpeed: 18
   pullSpeed: 40
   pullAcceleration: 60
   wallClimbBoostSpeed: 30
   overshootDistance: 5
   standHeightOffset: 0.25
   arriveThreshold: 0.65
-  cooldown: 0.6
+  cooldown: 0.1
   gunAimSpeed: 18
   hookShootSpeed: 95
   hookRetractSpeed: 110
@@ -1224,7 +1226,8 @@ GameObject:
   - component: {fileID: 7635016357681987304}
   - component: {fileID: 2213084137778160658}
   - component: {fileID: 4864456756849798777}
-  m_Layer: 7
+  - component: {fileID: 6345309465837024934}
+  m_Layer: 10
   m_Name: Player
   m_TagString: Player
   m_Icon: {fileID: 0}
@@ -1555,9 +1558,10 @@ MonoBehaviour:
   sustainHoverAction: {fileID: -2099379676528639254, guid: 052faaac586de48259a63d0c4782560b, type: 3}
   moveAction: {fileID: -1680190386980627800, guid: 052faaac586de48259a63d0c4782560b, type: 3}
   boostAction: {fileID: -7471211009204490832, guid: 052faaac586de48259a63d0c4782560b, type: 3}
-  movementScript: {fileID: 0}
-  cameraScript: {fileID: 0}
-  moveReferenceTransform: {fileID: 0}
+  movementScript: {fileID: 5464887421486324670}
+  grappleHookScript: {fileID: 1195401676550789947}
+  cameraScript: {fileID: 4768004406305984400}
+  moveReferenceTransform: {fileID: 9099146935271944496}
   launchUpSpeed: 14
   midAirBoostUpSpeed: 11
   airGravity: -20
@@ -1580,6 +1584,42 @@ MonoBehaviour:
   energySlider: {fileID: 0}
   smokeEffectObject: {fileID: 1761361466264927527}
   boostSmokeEffectObject: {fileID: 4613192103884663186}
+--- !u!114 &6345309465837024934
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 5361435603796722228}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: d440a641766c21f4abac17b3c73e07ce, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::HealthSystem
+  loaiDoiTuong: 0
+  mauToiDa: 100
+  giapPhongThu: 50
+  thoiGianBatTuSauTrungDon: 0
+  tuDongHoiMau: 1
+  thoiGianChoHoiMau: 5
+  tocDoHoiMau: 10
+  thanhMauSlider: {fileID: 0}
+  anThanhMauKhiDay: 1
+  nguonAmThanh: {fileID: 0}
+  amThanhTrungDon: {fileID: 0}
+  amThanhChet: {fileID: 0}
+  amLuong: 0.9
+  hieuUngKhiChet: {fileID: 0}
+  thoiGianHuyKhiChet: 0.15
+  onMauThayDoi:
+    m_PersistentCalls:
+      m_Calls: []
+  onTrungDon:
+    m_PersistentCalls:
+      m_Calls: []
+  onChet:
+    m_PersistentCalls:
+      m_Calls: []
 --- !u!1 &5502667422601066646
 GameObject:
   m_ObjectHideFlags: 0
@@ -1592,7 +1632,7 @@ GameObject:
   - component: {fileID: 2656667940044831215}
   - component: {fileID: 601019163236913843}
   - component: {fileID: 5220416435994556662}
-  m_Layer: 7
+  m_Layer: 0
   m_Name: Jumpack
   m_TagString: Untagged
   m_Icon: {fileID: 0}
@@ -2015,7 +2055,7 @@ Camera:
   m_Depth: 0
   m_CullingMask:
     serializedVersion: 2
-    m_Bits: 1719
+    m_Bits: 3767
   m_RenderingPath: -1
   m_TargetTexture: {fileID: 0}
   m_TargetDisplay: 0
@@ -2675,7 +2715,7 @@ MonoBehaviour:
   bulletPrefab: {fileID: 1788540390887508892, guid: c2d574f4417a1f2408b0e1175842d027, type: 3}
   firePoint: {fileID: 6553897970322261481}
   muzzleFlashPrefab: {fileID: 7141661092968700615, guid: d996f556081b61142a89af1cf817a3f6, type: 3}
-  shootAudioClip: {fileID: 8300000, guid: 2d6b50229dfe7964084d4a89ac406c6f, type: 3}
+  shootAudioClip: {fileID: 8300000, guid: a8085c46963167a4a9428ac9063b3b0c, type: 3}
   shootVolume: 1
   reloadAudioClip: {fileID: 8300000, guid: 0f03864d8c0dc0841a327d71d76d09d6, type: 3}
   reloadVolume: 1

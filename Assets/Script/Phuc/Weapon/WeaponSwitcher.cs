@@ -44,6 +44,9 @@ public class WeaponSwitcher : MonoBehaviour
     private Coroutine switchCoroutine;
     private bool isSwitchesInProgress = false;
 
+    // Property trả về chỉ số vũ khí hiện tại để WeaponUI và các script khác truy xuất
+    public int CurrentWeaponIndex => currentWeaponIndex;
+
     // Các Property trả về vũ khí hiện tại để các script khác truy xuất
     public WeaponSystem CurrentWeaponSystem => (weaponSystems != null && currentWeaponIndex >= 0 && currentWeaponIndex < weaponSystems.Length) ? weaponSystems[currentWeaponIndex] : null;
     public SniperWeapon CurrentSniperWeapon => (sniperWeapons != null && currentWeaponIndex >= 0 && currentWeaponIndex < sniperWeapons.Length) ? sniperWeapons[currentWeaponIndex] : null;
@@ -120,6 +123,15 @@ public class WeaponSwitcher : MonoBehaviour
     {
         if (isSwitchesInProgress || weapons == null || weapons.Length == 0) return;
 
+        // 1. Kiểm tra phím số 1 đến 9 (Legacy Input)
+        int numberKeyIndex = GetNumberKeyWeaponIndex();
+        if (numberKeyIndex >= 0 && numberKeyIndex < weapons.Length)
+        {
+            StartSwitchToWeapon(numberKeyIndex);
+            return;
+        }
+
+        // 2. Kiểm tra cuộn chuột để chuyển vũ khí kế tiếp / trước đó
         float scrollValue = 0f;
 
         if (scrollAction != null && scrollAction.action != null)
@@ -147,13 +159,38 @@ public class WeaponSwitcher : MonoBehaviour
                 if (nextIndex >= weapons.Length) nextIndex = 0;
             }
 
-            if (nextIndex != currentWeaponIndex)
+            StartSwitchToWeapon(nextIndex);
+        }
+    }
+
+    /// <summary>
+    /// Kiểm tra phím số 1..9 (hàng số trên bàn phím) theo kiểu Legacy Input và trả về chỉ số mảng 0..8
+    /// </summary>
+    private int GetNumberKeyWeaponIndex()
+    {
+        for (int i = 0; i < 9; i++)
+        {
+            KeyCode key = KeyCode.Alpha1 + i;
+            if (Input.GetKeyDown(key))
             {
-                if (switchCoroutine != null) StopCoroutine(switchCoroutine);
-                switchCoroutine = StartCoroutine(SwitchWeaponSequence(currentWeaponIndex, nextIndex));
-                currentWeaponIndex = nextIndex;
+                return i;
             }
         }
+        return -1;
+    }
+
+    /// <summary>
+    /// Khởi chạy chuỗi đổi vũ khí nếu chỉ số hợp lệ và khác vũ khí hiện tại
+    /// </summary>
+    private void StartSwitchToWeapon(int targetIndex)
+    {
+        if (weapons == null || targetIndex < 0 || targetIndex >= weapons.Length) return;
+        if (targetIndex == currentWeaponIndex) return;
+        if (weapons[targetIndex] == null) return;
+
+        if (switchCoroutine != null) StopCoroutine(switchCoroutine);
+        switchCoroutine = StartCoroutine(SwitchWeaponSequence(currentWeaponIndex, targetIndex));
+        currentWeaponIndex = targetIndex;
     }
 
     private IEnumerator SwitchWeaponSequence(int oldIndex, int newIndex)
