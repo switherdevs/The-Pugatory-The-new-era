@@ -80,65 +80,108 @@ public class IronStormMovement : MonoBehaviour
     private bool isCrouching;
     private float stepTimer;
 
-    // Các biến quản lý trạng thái tốc biến
     private bool isDashing;
     private float dashTimer;
     private float dashCooldownTimer;
     private Vector3 dashDirection;
 
-    // Các thuộc tính cung cấp trạng thái cho Camera đọc
-    public bool IsRunning => sprintAction.action.IsPressed() && !isCrouching && !isDashing;
+    public bool IsRunning
+    {
+        get
+        {
+            bool sprintPressed = sprintAction != null && sprintAction.action != null
+                ? sprintAction.action.IsPressed()
+                : Input.GetKey(KeyCode.LeftShift);
+            return sprintPressed && !isCrouching && !isDashing;
+        }
+    }
+
     public bool IsCrouching => isCrouching;
     public bool IsGrounded => isGrounded;
     public bool IsDashing => isDashing;
-    public Vector2 CurrentInputDirection => moveAction.action.ReadValue<Vector2>();
+
+    public Vector2 CurrentInputDirection
+    {
+        get
+        {
+            if (moveAction != null && moveAction.action != null)
+                return moveAction.action.ReadValue<Vector2>();
+            return new Vector2(Input.GetAxisRaw("Horizontal"), Input.GetAxisRaw("Vertical"));
+        }
+    }
 
     private void OnEnable()
     {
-        moveAction.action.Enable();
-        jumpAction.action.Enable();
-        sprintAction.action.Enable();
-        crouchAction.action.Enable();
-        if (dashAction != null) dashAction.action.Enable();
+        if (moveAction != null && moveAction.action != null) moveAction.action.Enable();
+        if (jumpAction != null && jumpAction.action != null) jumpAction.action.Enable();
+        if (sprintAction != null && sprintAction.action != null) sprintAction.action.Enable();
+        if (crouchAction != null && crouchAction.action != null) crouchAction.action.Enable();
+        if (dashAction != null && dashAction.action != null) dashAction.action.Enable();
     }
 
     private void OnDisable()
     {
-        moveAction.action.Disable();
-        jumpAction.action.Disable();
-        sprintAction.action.Disable();
-        crouchAction.action.Disable();
-        if (dashAction != null) dashAction.action.Disable();
+        if (moveAction != null && moveAction.action != null) moveAction.action.Disable();
+        if (jumpAction != null && jumpAction.action != null) jumpAction.action.Disable();
+        if (sprintAction != null && sprintAction.action != null) sprintAction.action.Disable();
+        if (crouchAction != null && crouchAction.action != null) crouchAction.action.Disable();
+        if (dashAction != null && dashAction.action != null) dashAction.action.Disable();
     }
 
     private void Start()
     {
         controller = GetComponent<CharacterController>();
-        defaultHeight = controller.height;
+        if (controller != null)
+        {
+            defaultHeight = controller.height;
+        }
+    }
+
+    private bool WasJumpTriggered()
+    {
+        if (jumpAction != null && jumpAction.action != null)
+            return jumpAction.action.triggered;
+        return Input.GetKeyDown(KeyCode.Space);
+    }
+
+    private bool WasCrouchTriggered()
+    {
+        if (crouchAction != null && crouchAction.action != null)
+            return crouchAction.action.triggered;
+        return Input.GetKeyDown(KeyCode.LeftControl);
+    }
+
+    private bool WasDashTriggered()
+    {
+        if (dashAction != null && dashAction.action != null)
+            return dashAction.action.triggered;
+        return Input.GetKeyDown(KeyCode.LeftAlt) || Input.GetKeyDown(KeyCode.V);
     }
 
     private void Update()
     {
-        // Đếm ngược thời gian hồi chiêu né
+        if (controller == null)
+            controller = GetComponent<CharacterController>();
+        if (controller == null || !controller.enabled)
+            return;
+
         if (dashCooldownTimer > 0f)
         {
             dashCooldownTimer -= Time.deltaTime;
         }
 
-        // Kiểm tra trạng thái chạm đất để reset lực rơi
         isGrounded = controller.isGrounded;
         if (isGrounded && velocity.y < 0)
         {
             velocity.y = -2f;
         }
 
-        // Đọc giá trị đầu vào từ New Input System và chuẩn hóa vector đi chéo
-        Vector2 inputDir = moveAction.action.ReadValue<Vector2>();
+        // Hướng di chuyển lấy theo transform của playerBody (xoay ngang sạch, không bị scale méo)
+        Vector2 inputDir = CurrentInputDirection;
         Vector3 move = transform.right * inputDir.x + transform.forward * inputDir.y;
         move = Vector3.ClampMagnitude(move, 1f);
 
-        // Kích hoạt trạng thái né (Tốc biến) khi bấm phím và đã hết thời gian hồi
-        if (dashAction != null && dashAction.action.triggered && !isDashing && dashCooldownTimer <= 0f)
+        if (WasDashTriggered() && !isDashing && dashCooldownTimer <= 0f)
         {
             isDashing = true;
             dashCooldownTimer = dashCooldown;
@@ -146,7 +189,6 @@ public class IronStormMovement : MonoBehaviour
             dashDirection = move.sqrMagnitude > 0.01f ? move.normalized : transform.forward;
         }
 
-        // Nếu đang trong trạng thái tốc biến thì ưu tiên lướt đi và bỏ qua di chuyển thường
         if (isDashing)
         {
             controller.Move(dashDirection * dashSpeed * Time.deltaTime);
@@ -158,15 +200,13 @@ public class IronStormMovement : MonoBehaviour
             return;
         }
 
-        // Xử lý chuyển đổi trạng thái ngồi và nội suy chiều cao mượt mà
-        if (crouchAction.action.triggered)
+        if (WasCrouchTriggered())
         {
             isCrouching = !isCrouching;
         }
         float targetHeight = isCrouching ? crouchHeight : defaultHeight;
         controller.height = Mathf.Lerp(controller.height, targetHeight, crouchTransitionSpeed * Time.deltaTime);
 
-        // Xác định tốc độ hiện tại dựa trên trạng thái chạy hoặc ngồi
         bool isRunning = IsRunning;
         float currentSpeed = isRunning ? runSpeed : normalSpeed;
         if (isCrouching)
@@ -174,10 +214,8 @@ public class IronStormMovement : MonoBehaviour
             currentSpeed *= 0.5f;
         }
 
-        // Thực hiện di chuyển phương ngang
         controller.Move(move * currentSpeed * Time.deltaTime);
 
-        // Xử lý âm thanh tiếng bước chân khi di chuyển
         bool isMoving = inputDir.sqrMagnitude > 0.01f && isGrounded;
         if (isMoving)
         {
@@ -189,10 +227,8 @@ public class IronStormMovement : MonoBehaviour
             {
                 if (footstepAudioSource != null && footstepClip != null)
                 {
-                    // Giữ nguyên cao độ chuẩn, chỉ tạo độ lệch ngẫu nhiên nhỏ (pitchRandomness) để không bị nhàm chán
                     float basePitch = isCrouching ? 0.8f : 1.0f;
                     footstepAudioSource.pitch = basePitch + Random.Range(-pitchRandomness, pitchRandomness);
-                    // Phát âm thanh với mức âm lượng được chỉnh bằng slider (footstepVolume)
                     footstepAudioSource.PlayOneShot(footstepClip, footstepVolume);
                 }
                 stepTimer = currentInterval;
@@ -203,13 +239,11 @@ public class IronStormMovement : MonoBehaviour
             stepTimer = 0f;
         }
 
-        // Xử lý hành động nhảy
-        if (jumpAction.action.triggered && isGrounded && !isCrouching)
+        if (WasJumpTriggered() && isGrounded && !isCrouching)
         {
             velocity.y = Mathf.Sqrt(jumpHeight * -2f * gravity);
         }
 
-        // Tính toán và áp dụng trọng lực theo thời gian
         velocity.y += gravity * Time.deltaTime;
         controller.Move(velocity * Time.deltaTime);
     }
