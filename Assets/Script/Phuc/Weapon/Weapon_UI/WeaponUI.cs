@@ -3,48 +3,53 @@ using UnityEngine.UI;
 using UnityEngine.InputSystem;
 using TMPro;
 
+// Hien thi ten vu khi, so luong dan/luu dan, che do ban va phong to o vu khi dang chon
 public class WeaponUI : MonoBehaviour
 {
     [Header("References")]
-    [Tooltip("Tham chiếu tới script WeaponSwitcher trong Scene (Sẽ tự động tìm nếu để trống).")]
+    [Tooltip("Tham chieu toi script WeaponSwitcher trong Scene (Se tu dong tim neu de trong).")]
     [SerializeField] private WeaponSwitcher weaponSwitcher;
 
-    [Tooltip("Tham chiếu tới script súng bắn móc GrappleHook (Sẽ tự động tìm nếu để trống).")]
+    [Tooltip("Tham chieu toi script sung ban moc GrappleHook (Se tu dong tim neu de trong).")]
     [SerializeField] private GrappleHook grappleHook;
 
     [Header("UI Components (TextMeshPro)")]
-    [Tooltip("TextMeshProUGUI hiển thị TÊN VŨ KHÍ hiện tại (Ví dụ: Rifle, AWP, CombatKnife, Grapple Hook).")]
+    [Tooltip("TextMeshProUGUI hien thi TEN VU KHI hien tai (Vi du: Rifle, AWP, CombatKnife, Frag Grenade, Grapple Hook).")]
     [SerializeField] private TextMeshProUGUI weaponNameText;
 
-    [Tooltip("TextMeshProUGUI hiển thị số đạn hoặc trạng thái dây móc.")]
+    [Tooltip("TextMeshProUGUI hien thi so dan, so luu dan hoac trang thai day moc.")]
     [SerializeField] private TextMeshProUGUI ammoText;
 
-    [Tooltip("TextMeshProUGUI hiển thị chế độ bắn hoặc loại vũ khí (SEMI / AUTO / SNIPER / MELEE / GRAPPLE).")]
+    [Tooltip("TextMeshProUGUI hien thi che do ban hoac loai vu khi (SEMI / AUTO / SNIPER / MELEE / GRENADE / GRAPPLE).")]
     [SerializeField] private TextMeshProUGUI fireModeText;
 
-    [Header("Weapon Slot Images (Mảng ô hiển thị vũ khí)")]
-    [Tooltip("Mảng hiển thị các ô Image vũ khí (mặc định 3 ô). Ô nào đang được chọn sẽ tự động phóng to mượt mà.")]
-    [SerializeField] private Image[] weaponSlotImages = new Image[3];
+    [Header("Weapon Slot Images (Mang o hien thi vu khi 0..4)")]
+    [Tooltip("Mang hien thi cac o Image vu khi (5 o tuong ung 0..4). O nao dang duoc chon se tu dong phong to muot ma.")]
+    [SerializeField] private Image[] weaponSlotImages = new Image[WeaponSwitcher.MaxWeaponSlots];
 
-    [Tooltip("Tỉ lệ phóng to của ô vũ khí đang được chọn (Ví dụ: 1.25 là to gấp 1.25 lần).")]
+    [Tooltip("Ti le phong to cua o vu khi dang duoc chon (Vi du: 1.25 la to gap 1.25 lan).")]
     [SerializeField] private float selectedSlotScale = 1.25f;
 
-    [Tooltip("Tốc độ phóng to / thu nhỏ mượt mà của các ô vũ khí.")]
+    [Tooltip("Toc do phong to / thu nho muot ma cua cac o vu khi.")]
     [SerializeField] private float slotScaleSpeed = 12f;
 
-    [Header("Audio (Âm thanh đổi vũ khí)")]
-    [Tooltip("AudioSource dùng để phát âm thanh (tự động lấy hoặc thêm nếu để trống).")]
+    [Range(0.1f, 1f)]
+    [Tooltip("Do trong suot (Alpha) cua o vu khi khi trong hoac da het dan/luu dan.")]
+    [SerializeField] private float alphaOTrongHoacHetDan = 0.35f;
+
+    [Header("Audio (Am thanh doi vu khi)")]
+    [Tooltip("AudioSource dung de phat am thanh (tu dong lay hoac them neu de trong).")]
     [SerializeField] private AudioSource audioSource;
 
-    [Tooltip("Âm thanh phát ra khi người chơi đổi vũ khí.")]
+    [Tooltip("Am thanh phat ra khi nguoi choi doi vu khi.")]
     [SerializeField] private AudioClip switchWeaponSound;
 
     [Range(0f, 1f)]
-    [Tooltip("Âm lượng khi phát tiếng đổi vũ khí.")]
+    [Tooltip("Am luong khi phat tieng doi vu khi.")]
     [SerializeField] private float switchSoundVolume = 1f;
 
     [Header("Input Action References")]
-    [Tooltip("Phím bấm New Input System để chuyển đổi chế độ bắn (Ví dụ: phím V).")]
+    [Tooltip("Phim bam New Input System de chuyen doi che do ban (Vi du: phim V).")]
     [SerializeField] private InputActionReference switchModeAction;
 
     private Vector3[] originalSlotScales;
@@ -52,12 +57,12 @@ public class WeaponUI : MonoBehaviour
 
     private void OnEnable()
     {
-        if (switchModeAction != null) switchModeAction.action.Enable();
+        if (switchModeAction != null && switchModeAction.action != null) switchModeAction.action.Enable();
     }
 
     private void OnDisable()
     {
-        if (switchModeAction != null) switchModeAction.action.Disable();
+        if (switchModeAction != null && switchModeAction.action != null) switchModeAction.action.Disable();
     }
 
     private void Awake()
@@ -65,10 +70,6 @@ public class WeaponUI : MonoBehaviour
         if (weaponSwitcher == null)
         {
             weaponSwitcher = FindFirstObjectByType<WeaponSwitcher>();
-            if (weaponSwitcher == null)
-            {
-                Debug.LogWarning("WeaponUI không tìm thấy WeaponSwitcher nào trong Scene!");
-            }
         }
 
         if (grappleHook == null)
@@ -99,7 +100,7 @@ public class WeaponUI : MonoBehaviour
 
     private void Update()
     {
-        if (switchModeAction != null && switchModeAction.action.triggered)
+        if (switchModeAction != null && switchModeAction.action != null && switchModeAction.action.triggered)
         {
             ToggleWeaponModeViaInput();
         }
@@ -117,12 +118,13 @@ public class WeaponUI : MonoBehaviour
             lastWeaponIndex = currentIndex;
         }
 
-        UpdateWeaponSlotScales(currentIndex);
+        UpdateWeaponSlotScalesAndAlpha(currentIndex);
 
-        // Lấy thông tin các loại vũ khí từ Switcher
+        // Lay thong tin cac loai vu khi tu WeaponSwitcher
         WeaponSystem currentWeapon = weaponSwitcher.CurrentWeaponSystem;
         SniperWeapon currentSniper = weaponSwitcher.CurrentSniperWeapon;
         MeleeWeapon currentMelee = weaponSwitcher.CurrentMeleeWeapon;
+        GrenadeWeapon currentGrenade = weaponSwitcher.CurrentGrenadeWeapon;
 
         GrappleHook activeGrapple = grappleHook;
         if (activeGrapple == null && weaponSwitcher.CurrentWeaponName != null)
@@ -132,15 +134,27 @@ public class WeaponUI : MonoBehaviour
 
         bool isGrappleEquipped = activeGrapple != null && activeGrapple.isActiveAndEnabled;
 
-        if (weaponNameText != null)
+        if (currentGrenade != null)
         {
-            weaponNameText.text = isGrappleEquipped
-                ? activeGrapple.WeaponDisplayName.ToUpper()
-                : weaponSwitcher.CurrentWeaponName.ToUpper();
+            if (weaponNameText != null)
+            {
+                weaponNameText.text = currentGrenade.WeaponDisplayName.ToUpper();
+            }
+            if (ammoText != null)
+            {
+                ammoText.text = currentGrenade.CurrentStateLabel;
+            }
+            if (fireModeText != null)
+            {
+                fireModeText.text = currentGrenade.ModeLabel;
+            }
         }
-
-        if (currentWeapon != null)
+        else if (currentWeapon != null)
         {
+            if (weaponNameText != null)
+            {
+                weaponNameText.text = weaponSwitcher.CurrentWeaponName.ToUpper();
+            }
             if (ammoText != null)
             {
                 ammoText.text = currentWeapon.CurrentAmmo + " / " + currentWeapon.ReserveAmmo;
@@ -152,6 +166,10 @@ public class WeaponUI : MonoBehaviour
         }
         else if (currentSniper != null)
         {
+            if (weaponNameText != null)
+            {
+                weaponNameText.text = weaponSwitcher.CurrentWeaponName.ToUpper();
+            }
             if (ammoText != null)
             {
                 ammoText.text = currentSniper.CurrentAmmo + " / " + currentSniper.ReserveAmmo;
@@ -163,6 +181,10 @@ public class WeaponUI : MonoBehaviour
         }
         else if (currentMelee != null)
         {
+            if (weaponNameText != null)
+            {
+                weaponNameText.text = weaponSwitcher.CurrentWeaponName.ToUpper();
+            }
             if (ammoText != null)
             {
                 ammoText.text = "MELEE";
@@ -174,6 +196,10 @@ public class WeaponUI : MonoBehaviour
         }
         else if (isGrappleEquipped)
         {
+            if (weaponNameText != null)
+            {
+                weaponNameText.text = activeGrapple.WeaponDisplayName.ToUpper();
+            }
             if (ammoText != null)
             {
                 ammoText.text = activeGrapple.CurrentStateLabel;
@@ -204,7 +230,7 @@ public class WeaponUI : MonoBehaviour
         }
     }
 
-    private void UpdateWeaponSlotScales(int selectedIndex)
+    private void UpdateWeaponSlotScalesAndAlpha(int selectedIndex)
     {
         if (weaponSlotImages == null || weaponSlotImages.Length == 0) return;
 
@@ -217,16 +243,23 @@ public class WeaponUI : MonoBehaviour
 
         for (int i = 0; i < weaponSlotImages.Length; i++)
         {
-            if (weaponSlotImages[i] == null) continue;
+            Image slotImage = weaponSlotImages[i];
+            if (slotImage == null) continue;
 
+            bool slotKhaDung = weaponSwitcher.CoTheChonSlot(i);
             Vector3 baseScale = originalSlotScales[i];
-            Vector3 targetScale = (i == selectedIndex) ? baseScale * selectedSlotScale : baseScale;
+            Vector3 targetScale = (i == selectedIndex && slotKhaDung) ? baseScale * selectedSlotScale : baseScale;
 
-            weaponSlotImages[i].rectTransform.localScale = Vector3.Lerp(
-                weaponSlotImages[i].rectTransform.localScale,
+            slotImage.rectTransform.localScale = Vector3.Lerp(
+                slotImage.rectTransform.localScale,
                 targetScale,
                 lerpFactor
             );
+
+            // Lam mo nhe o UI neu slot trong hoac da het luu dan
+            Color mauHienTai = slotImage.color;
+            mauHienTai.a = slotKhaDung ? 1f : alphaOTrongHoacHetDan;
+            slotImage.color = mauHienTai;
         }
     }
 

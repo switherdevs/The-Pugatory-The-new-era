@@ -110,6 +110,7 @@ public class IronStormMovement : MonoBehaviour
     public bool IsGrounded => isGrounded;
     public bool IsDashing => isDashing;
     public bool CanDashNow => !isDashing && dashCooldownTimer <= 0f;
+    public float AirDashVerticalCarry => airDashVerticalCarry;
 
     public Vector2 CurrentInputDirection
     {
@@ -165,7 +166,18 @@ public class IronStormMovement : MonoBehaviour
     public bool WasDashTriggered()
     {
         if (dashAction != null && dashAction.action != null)
-            return dashAction.action.triggered;
+        {
+            if (!dashAction.action.enabled) dashAction.action.Enable();
+            if (dashAction.action.WasPressedThisFrame() || dashAction.action.triggered)
+                return true;
+        }
+
+        if (Keyboard.current != null &&
+            (Keyboard.current.leftAltKey.wasPressedThisFrame || Keyboard.current.vKey.wasPressedThisFrame))
+        {
+            return true;
+        }
+
         return Input.GetKeyDown(KeyCode.LeftAlt) || Input.GetKeyDown(KeyCode.V);
     }
 

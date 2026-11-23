@@ -1,26 +1,27 @@
+using System.Collections;
 using UnityEngine;
 using UnityEngine.InputSystem;
-using System.Collections;
 
+// Quan ly doi vu khi, nhat/vut vu khi vao GameObject Holder, tu chuyen ve index 0 khi het luu dan
 public class WeaponSwitcher : MonoBehaviour
 {
-    public const int MaxWeaponSlots = 5; // 0: Chính, 1: Phụ, 2: Cận chiến, 3: Lựu đạn, 4: Hỗ trợ
+    public const int MaxWeaponSlots = 5; // 0: Chinh, 1: Phu, 2: Can chien, 3: Luu dan, 4: Ho tro
 
-    [Header("Weapon Settings (5 Index Cố Định: 0..4)")]
-    [Tooltip("Mảng 5 ô: [0] Vũ khí chính, [1] Vũ khí phụ, [2] Cận chiến, [3] Lựu đạn, [4] Thiết bị hỗ trợ.")]
+    [Header("Weapon Settings (5 Index Co Dinh: 0..4)")]
+    [Tooltip("Mang 5 o: [0] Vu khi chinh, [1] Vu khi phu, [2] Can chien, [3] Luu dan, [4] Thiet bi ho tro.")]
     [SerializeField] private GameObject[] weapons = new GameObject[MaxWeaponSlots];
 
-    [Tooltip("Transform chứa vũ khí khi cầm trên tay (để trống sẽ tự lấy chính GameObject này).")]
+    [Tooltip("GameObject Holder chua vu khi khi nhat/cam tren tay (neu de trong se tu lay chinh GameObject nay).")]
     [SerializeField] private Transform weaponHolder;
 
     [Header("Input Action")]
-    [Tooltip("Kéo InputAction loại Vector2 (hoặc Mouse Scroll) từ Input Actions Asset vào đây.")]
+    [Tooltip("Keo InputAction loai Vector2 (hoac Mouse Scroll) tu Input Actions Asset vao day.")]
     [SerializeField] private InputActionReference scrollAction;
 
-    [Tooltip("Phím nhặt vũ khí bằng New Input System (để trống sẽ tự dùng phím E).")]
+    [Tooltip("Phim nhat vu khi bang New Input System (de trong se tu dung phim E).")]
     [SerializeField] private InputActionReference pickupWeaponAction;
 
-    [Tooltip("Phím vứt vũ khí đang cầm bằng New Input System (để trống sẽ tự dùng phím G).")]
+    [Tooltip("Phim vut vu khi dang cam bang New Input System (de trong se tu dung phim G).")]
     [SerializeField] private InputActionReference dropWeaponAction;
 
     [Header("Pickup & Drop Settings")]
@@ -31,24 +32,24 @@ public class WeaponSwitcher : MonoBehaviour
     [SerializeField] private float dropForwardForce = 4.5f;
     [SerializeField] private float dropUpwardForce = 2.0f;
 
-    [Header("=== 1. HOLSTER SETTINGS (CẤT VŨ KHÍ) ===")]
-    [Tooltip("Độ dịch chuyển vị trí Y khi cất súng (Nhập số âm tùy ý, ví dụ: -0.4).")]
+    [Header("=== 1. HOLSTER SETTINGS (CAT VU KHI) ===")]
+    [Tooltip("Do dich chuyen vi tri Y khi cat sung (Nhap so am tuy y, vi du: -0.4).")]
     [SerializeField] private float holsterOffsetY = -0.4f;
 
-    [Tooltip("Góc nghiêng Z khi cất súng (Ví dụ: 30 độ).")]
+    [Tooltip("Goc nghieng Z khi cat sung (Vi du: 30 do).")]
     [SerializeField] private float holsterOffsetZ = 30f;
 
-    [Tooltip("Thời gian thực hiện cất súng (giây).")]
+    [Tooltip("Thoi gian thuc hien cat sung (giay).")]
     [SerializeField] private float holsterDuration = 0.2f;
 
-    [Header("=== 2. EQUIP SETTINGS (RÚT VŨ KHÍ) ===")]
-    [Tooltip("Độ dịch chuyển vị trí Y khi rút súng từ dưới lên (Nhập số âm tùy ý, ví dụ: -0.4).")]
+    [Header("=== 2. EQUIP SETTINGS (RUT VU KHI) ===")]
+    [Tooltip("Do dich chuyen vi tri Y khi rut sung tu duoi len (Nhap so am tuy y, vi du: -0.4).")]
     [SerializeField] private float equipOffsetY = -0.4f;
 
-    [Tooltip("Góc nghiêng Z khi bắt đầu rút súng (Ví dụ: -30 độ).")]
+    [Tooltip("Goc nghieng Z khi bat dau rut sung (Vi du: -30 do).")]
     [SerializeField] private float equipOffsetZ = -30f;
 
-    [Tooltip("Thời gian thực hiện rút súng (giây).")]
+    [Tooltip("Thoi gian thuc hien rut sung (giay).")]
     [SerializeField] private float equipDuration = 0.2f;
 
     private int currentWeaponIndex = 0;
@@ -56,6 +57,7 @@ public class WeaponSwitcher : MonoBehaviour
     private WeaponSystem[] weaponSystems;
     private SniperWeapon[] sniperWeapons;
     private MeleeWeapon[] meleeWeapons;
+    private GrenadeWeapon[] grenadeWeapons;
 
     private Vector3[] originalLocalPositions;
     private Quaternion[] originalLocalRotations;
@@ -72,11 +74,18 @@ public class WeaponSwitcher : MonoBehaviour
     private InputAction ActiveDropAction =>
         dropWeaponAction != null && dropWeaponAction.action != null ? dropWeaponAction.action : runtimeDropAction;
 
+    public Transform HolderTransform => weaponHolder != null ? weaponHolder : transform;
     public int CurrentWeaponIndex => currentWeaponIndex;
 
     public WeaponSystem CurrentWeaponSystem => (weaponSystems != null && currentWeaponIndex >= 0 && currentWeaponIndex < weaponSystems.Length) ? weaponSystems[currentWeaponIndex] : null;
     public SniperWeapon CurrentSniperWeapon => (sniperWeapons != null && currentWeaponIndex >= 0 && currentWeaponIndex < sniperWeapons.Length) ? sniperWeapons[currentWeaponIndex] : null;
     public MeleeWeapon CurrentMeleeWeapon => (meleeWeapons != null && currentWeaponIndex >= 0 && currentWeaponIndex < meleeWeapons.Length) ? meleeWeapons[currentWeaponIndex] : null;
+    public GrenadeWeapon CurrentGrenadeWeapon => (grenadeWeapons != null && currentWeaponIndex >= 0 && currentWeaponIndex < grenadeWeapons.Length) ? grenadeWeapons[currentWeaponIndex] : null;
+
+    // Lay nhanh GrenadeWeapon dang nam o o Luu dan (Slot 3)
+    public GrenadeWeapon EquippedGrenadeSlot => (grenadeWeapons != null && grenadeWeapons.Length > (int)WeaponCategory.Grenade)
+        ? grenadeWeapons[(int)WeaponCategory.Grenade]
+        : null;
 
     public string CurrentWeaponName
     {
@@ -92,7 +101,6 @@ public class WeaponSwitcher : MonoBehaviour
 
     private void OnValidate()
     {
-        // Đảm bảo mảng vũ khí mặc định luôn chỉ có 5 index (0..4)
         if (weapons == null || weapons.Length != MaxWeaponSlots)
         {
             GameObject[] resized = new GameObject[MaxWeaponSlots];
@@ -151,12 +159,13 @@ public class WeaponSwitcher : MonoBehaviour
     private void Start()
     {
         ArrangeWeaponsIntoClassifiedSlots();
+        GanCacVuKhiBanDauVaoHolder();
         RebuildWeaponCaches(initialSetup: true);
 
         int firstIdx = FindFirstValidWeaponIndex(0);
         currentWeaponIndex = firstIdx >= 0 ? firstIdx : 0;
 
-        if (firstIdx >= 0 && weapons[firstIdx] != null)
+        if (firstIdx >= 0 && weapons[firstIdx] != null && CoTheChonSlot(firstIdx))
         {
             weapons[firstIdx].SetActive(true);
             StartCoroutine(PlayEquipAnimation(
@@ -167,9 +176,55 @@ public class WeaponSwitcher : MonoBehaviour
         }
     }
 
-    /// <summary>
-    /// Sắp xếp các vũ khí ban đầu vào đúng index phân loại (0..4) của chúng
-    /// </summary>
+    // Kiem tra slot co vu khi hop le de rut ra cam hay khong (neu la luu dan ma het dan thi khong cho chon)
+    public bool CoTheChonSlot(int index)
+    {
+        if (weapons == null || index < 0 || index >= MaxWeaponSlots) return false;
+        if (weapons[index] == null) return false;
+
+        if (grenadeWeapons != null && index < grenadeWeapons.Length && grenadeWeapons[index] != null)
+        {
+            return grenadeWeapons[index].ConLuuDan;
+        }
+
+        return true;
+    }
+
+    // Duoc goi tu GrenadeWeapon ngay khi nem het qua luu dan cuoi cung
+    public void XuLyKhiHetLuuDanChuyenVeIndex0()
+    {
+        int slotLuuDan = (int)WeaponCategory.Grenade;
+        if (weapons != null && slotLuuDan >= 0 && slotLuuDan < MaxWeaponSlots && weapons[slotLuuDan] != null)
+        {
+            weapons[slotLuuDan].SetActive(false);
+        }
+
+        if (switchCoroutine != null)
+        {
+            StopCoroutine(switchCoroutine);
+            switchCoroutine = null;
+            isSwitchesInProgress = false;
+        }
+
+        // Uu tien chuyen select ve index 0 neu index 0 hop le; neu index 0 trong thi tim vu khi hop le gan nhat
+        int targetIndex = CoTheChonSlot(0) ? 0 : FindFirstValidWeaponIndex(0);
+        if (targetIndex >= 0 && weapons[targetIndex] != null)
+        {
+            currentWeaponIndex = targetIndex;
+            weapons[targetIndex].SetActive(true);
+            switchCoroutine = StartCoroutine(PlayEquipAnimation(
+                weapons[targetIndex].transform,
+                originalLocalPositions[targetIndex],
+                originalLocalRotations[targetIndex]
+            ));
+        }
+        else
+        {
+            currentWeaponIndex = 0;
+        }
+    }
+
+    // Sap xep cac vu khi ban dau vao dung index phan loai (0..4) cua chung
     private void ArrangeWeaponsIntoClassifiedSlots()
     {
         GameObject[] arranged = new GameObject[MaxWeaponSlots];
@@ -190,13 +245,35 @@ public class WeaponSwitcher : MonoBehaviour
             {
                 arranged[i] = w;
             }
-            else
-            {
-                Debug.LogWarning($"Slot [{classifiedIndex}] đã có vũ khí, bỏ qua '{w.name}' trùng loại.");
-            }
         }
 
         weapons = arranged;
+    }
+
+    // Dam bao cac vu khi/luu dan da gan san trong mang deu thuoc con cua weaponHolder
+    private void GanCacVuKhiBanDauVaoHolder()
+    {
+        Transform holder = HolderTransform;
+        for (int i = 0; i < MaxWeaponSlots; i++)
+        {
+            GameObject w = weapons[i];
+            if (w == null) continue;
+
+            if (w.transform.parent != holder)
+            {
+                w.transform.SetParent(holder, false);
+                w.transform.localPosition = defaultEquippedLocalPosition;
+                w.transform.localRotation = Quaternion.Euler(defaultEquippedLocalEuler);
+            }
+
+            GrenadeWeapon grenadeComp = w.GetComponentInChildren<GrenadeWeapon>(true);
+            if (grenadeComp != null)
+            {
+                grenadeComp.DongBoTrangThaiSauKhiGanHolder(defaultEquippedLocalPosition, Quaternion.Euler(defaultEquippedLocalEuler));
+            }
+
+            WeaponClassifier.RefreshWeaponLayer(w);
+        }
     }
 
     private void Update()
@@ -271,6 +348,7 @@ public class WeaponSwitcher : MonoBehaviour
         return EquipPickedUpWeapon(bestCandidate);
     }
 
+    // Nhat vu khi/luu dan: gan lam con cua weaponHolder, dung vat ly, chuyen layer va xep vao dung slot (0..4)
     public bool EquipPickedUpWeapon(GameObject pickedWeapon)
     {
         if (pickedWeapon == null || IsAlreadyOwned(pickedWeapon)) return false;
@@ -278,14 +356,36 @@ public class WeaponSwitcher : MonoBehaviour
         WeaponCategory category = WeaponClassifier.GetWeaponCategory(pickedWeapon);
         int targetIndex = (int)category;
 
-        // Nếu index đó đã có súng/vũ khí rồi thì không thể nhặt thêm vũ khí cùng loại
+        // Neu da co object luu dan o slot 3 (ke ca khi dang an do het dan) -> cong them luu dan, GIU AN cho toi khi nguoi choi chon slot
+        if (category == WeaponCategory.Grenade && targetIndex >= 0 && targetIndex < MaxWeaponSlots && weapons[targetIndex] != null)
+        {
+            GrenadeWeapon existingGrenade = weapons[targetIndex].GetComponentInChildren<GrenadeWeapon>(true);
+            GrenadeWeapon pickedGrenade = pickedWeapon.GetComponentInChildren<GrenadeWeapon>(true);
+            if (existingGrenade != null)
+            {
+                int addCount = pickedGrenade != null ? Mathf.Max(1, pickedGrenade.CurrentGrenadeCount) : 1;
+                existingGrenade.AddGrenades(addCount);
+                Destroy(pickedWeapon);
+
+                // Chi hien lai neu nguoi choi dang chon dung slot luu dan
+                if (currentWeaponIndex == targetIndex)
+                {
+                    weapons[targetIndex].SetActive(true);
+                }
+                else
+                {
+                    weapons[targetIndex].SetActive(false);
+                }
+                return true;
+            }
+        }
+
         if (targetIndex < 0 || targetIndex >= MaxWeaponSlots || weapons[targetIndex] != null)
         {
-            Debug.LogWarning($"Index [{targetIndex}] ({category}) đã có vũ khí! Không thể nhặt thêm vũ khí cùng loại.");
             return false;
         }
 
-        if (weaponHolder == null) weaponHolder = transform;
+        Transform holder = HolderTransform;
 
         Rigidbody rb = pickedWeapon.GetComponent<Rigidbody>();
         if (rb != null)
@@ -301,12 +401,30 @@ public class WeaponSwitcher : MonoBehaviour
             cols[i].enabled = false;
         }
 
-        pickedWeapon.transform.SetParent(weaponHolder, false);
+        Vector3 savedScale = pickedWeapon.transform.localScale;
+
+        pickedWeapon.transform.SetParent(holder, false);
         pickedWeapon.transform.localPosition = defaultEquippedLocalPosition;
         pickedWeapon.transform.localRotation = Quaternion.Euler(defaultEquippedLocalEuler);
+        pickedWeapon.transform.localScale = savedScale;
+
+        GrenadeWeapon grenadeComp = pickedWeapon.GetComponentInChildren<GrenadeWeapon>(true);
+        if (grenadeComp != null)
+        {
+            grenadeComp.DongBoTrangThaiSauKhiGanHolder(defaultEquippedLocalPosition, Quaternion.Euler(defaultEquippedLocalEuler));
+        }
+
+        WeaponClassifier.RefreshWeaponLayer(pickedWeapon);
 
         weapons[targetIndex] = pickedWeapon;
         RebuildWeaponCaches(initialSetup: false);
+
+        // Neu nhặt luu dan lan dau khi dang cam vu khi khac -> chi cong vao slot, khong bat/chuyen sang ngay
+        if (category == WeaponCategory.Grenade && currentWeaponIndex != targetIndex)
+        {
+            pickedWeapon.SetActive(false);
+            return true;
+        }
 
         for (int i = 0; i < MaxWeaponSlots; i++)
         {
@@ -356,7 +474,7 @@ public class WeaponSwitcher : MonoBehaviour
         int droppedIndex = currentWeaponIndex;
         Transform dropRef = Camera.main != null ? Camera.main.transform : transform;
         Vector3 dropPos = dropRef.position + dropRef.forward * 1.1f + Vector3.up * 0.1f;
-        Vector3 dropDir = (dropRef.forward * dropForwardForce) + (Vector3.up * dropUpwardForce);
+        Vector3 dropDir = (dropRef.forward * dropForwardForce) + (dropRef.up * dropUpwardForce);
 
         weaponToDrop.SetActive(true);
         weaponToDrop.transform.SetParent(null, true);
@@ -367,6 +485,8 @@ public class WeaponSwitcher : MonoBehaviour
         {
             weaponToDrop.transform.localScale = originalLocalScales[droppedIndex];
         }
+
+        WeaponClassifier.RefreshWeaponLayer(weaponToDrop);
 
         Collider[] cols = weaponToDrop.GetComponentsInChildren<Collider>(true);
         for (int i = 0; i < cols.Length; i++)
@@ -384,7 +504,6 @@ public class WeaponSwitcher : MonoBehaviour
         rb.angularVelocity = Vector3.zero;
         rb.AddForce(dropDir, ForceMode.Impulse);
 
-        // Giải phóng index để có thể nhặt vũ khí mới cùng loại
         weapons[droppedIndex] = null;
         RebuildWeaponCaches(initialSetup: false);
 
@@ -395,6 +514,10 @@ public class WeaponSwitcher : MonoBehaviour
             weapons[currentWeaponIndex].SetActive(true);
             weapons[currentWeaponIndex].transform.localPosition = originalLocalPositions[currentWeaponIndex];
             weapons[currentWeaponIndex].transform.localRotation = originalLocalRotations[currentWeaponIndex];
+        }
+        else
+        {
+            currentWeaponIndex = 0;
         }
 
         return true;
@@ -411,6 +534,7 @@ public class WeaponSwitcher : MonoBehaviour
                 current.GetComponent<WeaponSystem>() != null ||
                 current.GetComponent<SniperWeapon>() != null ||
                 current.GetComponent<MeleeWeapon>() != null ||
+                current.GetComponent<GrenadeWeapon>() != null ||
                 current.GetComponent<GrappleHook>() != null)
             {
                 return current.gameObject;
@@ -436,6 +560,7 @@ public class WeaponSwitcher : MonoBehaviour
         weaponSystems = new WeaponSystem[MaxWeaponSlots];
         sniperWeapons = new SniperWeapon[MaxWeaponSlots];
         meleeWeapons = new MeleeWeapon[MaxWeaponSlots];
+        grenadeWeapons = new GrenadeWeapon[MaxWeaponSlots];
         originalLocalPositions = new Vector3[MaxWeaponSlots];
         originalLocalRotations = new Quaternion[MaxWeaponSlots];
         originalLocalScales = new Vector3[MaxWeaponSlots];
@@ -454,11 +579,7 @@ public class WeaponSwitcher : MonoBehaviour
                 weaponSystems[i] = weapons[i].GetComponent<WeaponSystem>();
                 sniperWeapons[i] = weapons[i].GetComponent<SniperWeapon>();
                 meleeWeapons[i] = weapons[i].GetComponent<MeleeWeapon>();
-
-                if (initialSetup && weaponSystems[i] == null && sniperWeapons[i] == null && meleeWeapons[i] == null && weapons[i].GetComponent<WeaponClassifier>() == null)
-                {
-                    Debug.LogWarning($"GameObject vũ khí '{weapons[i].name}' chưa có WeaponClassifier hoặc component vũ khí!");
-                }
+                grenadeWeapons[i] = weapons[i].GetComponentInChildren<GrenadeWeapon>(true);
 
                 weapons[i].SetActive(initialSetup ? false : wasActive);
             }
@@ -476,11 +597,11 @@ public class WeaponSwitcher : MonoBehaviour
         int clampedStart = Mathf.Clamp(startIndex, 0, MaxWeaponSlots - 1);
         for (int i = clampedStart; i < MaxWeaponSlots; i++)
         {
-            if (weapons[i] != null) return i;
+            if (CoTheChonSlot(i)) return i;
         }
         for (int i = 0; i < clampedStart; i++)
         {
-            if (weapons[i] != null) return i;
+            if (CoTheChonSlot(i)) return i;
         }
         return -1;
     }
@@ -494,7 +615,7 @@ public class WeaponSwitcher : MonoBehaviour
             if (idx < 0) idx = MaxWeaponSlots - 1;
             else if (idx >= MaxWeaponSlots) idx = 0;
 
-            if (weapons[idx] != null) return idx;
+            if (CoTheChonSlot(idx)) return idx;
         }
         return -1;
     }
@@ -514,9 +635,8 @@ public class WeaponSwitcher : MonoBehaviour
 
     private void StartSwitchToWeapon(int targetIndex)
     {
-        if (weapons == null || targetIndex < 0 || targetIndex >= MaxWeaponSlots) return;
-        if (targetIndex == currentWeaponIndex) return;
-        if (weapons[targetIndex] == null) return;
+        if (!CoTheChonSlot(targetIndex)) return;
+        if (targetIndex == currentWeaponIndex && weapons[targetIndex].activeSelf) return;
 
         if (switchCoroutine != null) StopCoroutine(switchCoroutine);
         switchCoroutine = StartCoroutine(SwitchWeaponSequence(currentWeaponIndex, targetIndex));

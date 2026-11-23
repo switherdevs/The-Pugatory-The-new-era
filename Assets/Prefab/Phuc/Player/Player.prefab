@@ -31,6 +31,81 @@ Transform:
   m_Children: []
   m_Father: {fileID: 1475286881056047159}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!1 &572872740158339311
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 8942677641602107796}
+  - component: {fileID: 6192157825607438318}
+  - component: {fileID: 1072704657753567826}
+  m_Layer: 5
+  m_Name: Scope
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!224 &8942677641602107796
+RectTransform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 572872740158339311}
+  m_LocalRotation: {x: -0, y: -0, z: -0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 20, y: 10.5, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 2487570468942427790}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+  m_AnchorMin: {x: 0.5, y: 0.5}
+  m_AnchorMax: {x: 0.5, y: 0.5}
+  m_AnchoredPosition: {x: 40.3, y: -14}
+  m_SizeDelta: {x: 100, y: 100}
+  m_Pivot: {x: 0.5, y: 0.5}
+--- !u!222 &6192157825607438318
+CanvasRenderer:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 572872740158339311}
+  m_CullTransparentMesh: 1
+--- !u!114 &1072704657753567826
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 572872740158339311}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: fe87c0e1cc204ed48ad3b37840f39efc, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: UnityEngine.UI::UnityEngine.UI.Image
+  m_Material: {fileID: 0}
+  m_Color: {r: 1, g: 1, b: 1, a: 1}
+  m_RaycastTarget: 1
+  m_RaycastPadding: {x: 0, y: 0, z: 0, w: 0}
+  m_Maskable: 1
+  m_OnCullStateChanged:
+    m_PersistentCalls:
+      m_Calls: []
+  m_Sprite: {fileID: -2086855793005798311, guid: 39d90b64d7123ea4c97e1121312b66e1, type: 3}
+  m_Type: 0
+  m_PreserveAspect: 0
+  m_FillCenter: 1
+  m_FillMethod: 4
+  m_FillAmount: 1
+  m_FillClockwise: 1
+  m_FillOrigin: 0
+  m_UseSpriteMesh: 0
+  m_PixelsPerUnitMultiplier: 1
 --- !u!1 &2300890862258506982
 GameObject:
   m_ObjectHideFlags: 0
@@ -62,6 +137,108 @@ Transform:
   m_Children: []
   m_Father: {fileID: 6120820107297739640}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!1 &3268674705022662049
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 2487570468942427790}
+  - component: {fileID: 2546371679619333499}
+  - component: {fileID: 3087311004201263635}
+  - component: {fileID: 6012217418933037072}
+  m_Layer: 5
+  m_Name: Canvas_scrope
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!224 &2487570468942427790
+RectTransform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 3268674705022662049}
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 0, y: 0, z: 0}
+  m_ConstrainProportionsScale: 0
+  m_Children:
+  - {fileID: 8942677641602107796}
+  m_Father: {fileID: 1475286881056047159}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+  m_AnchorMin: {x: 0, y: 0}
+  m_AnchorMax: {x: 0, y: 0}
+  m_AnchoredPosition: {x: 0, y: 0}
+  m_SizeDelta: {x: 0, y: 0}
+  m_Pivot: {x: 0, y: 0}
+--- !u!223 &2546371679619333499
+Canvas:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 3268674705022662049}
+  m_Enabled: 1
+  serializedVersion: 3
+  m_RenderMode: 0
+  m_Camera: {fileID: 0}
+  m_PlaneDistance: 100
+  m_PixelPerfect: 0
+  m_ReceivesEvents: 1
+  m_OverrideSorting: 0
+  m_OverridePixelPerfect: 0
+  m_SortingBucketNormalizedSize: 0
+  m_VertexColorAlwaysGammaSpace: 1
+  m_AdditionalShaderChannelsFlag: 0
+  m_UpdateRectTransformForStandalone: 0
+  m_SortingLayerID: 0
+  m_SortingOrder: 80
+  m_TargetDisplay: 0
+--- !u!114 &3087311004201263635
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 3268674705022662049}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 0cd44c1031e13a943bb63640046fad76, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: UnityEngine.UI::UnityEngine.UI.CanvasScaler
+  m_UiScaleMode: 1
+  m_ReferencePixelsPerUnit: 100
+  m_ScaleFactor: 1
+  m_ReferenceResolution: {x: 1920, y: 1080}
+  m_ScreenMatchMode: 0
+  m_MatchWidthOrHeight: 0
+  m_PhysicalUnit: 3
+  m_FallbackScreenDPI: 96
+  m_DefaultSpriteDPI: 96
+  m_DynamicPixelsPerUnit: 1
+  m_PresetInfoIsWorld: 0
+--- !u!114 &6012217418933037072
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 3268674705022662049}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: dc42784cf147c0c48a680349fa168899, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: UnityEngine.UI::UnityEngine.UI.GraphicRaycaster
+  m_IgnoreReversedGraphics: 1
+  m_BlockingObjects: 0
+  m_BlockingMask:
+    serializedVersion: 2
+    m_Bits: 4294967295
 --- !u!1 &4317670434159137578
 GameObject:
   m_ObjectHideFlags: 0
@@ -241,6 +418,7 @@ GameObject:
   - component: {fileID: 2213084137778160658}
   - component: {fileID: 4864456756849798777}
   - component: {fileID: 6345309465837024934}
+  - component: {fileID: 7584451691916554637}
   m_Layer: 10
   m_Name: Player
   m_TagString: Player
@@ -263,6 +441,7 @@ Transform:
   m_Children:
   - {fileID: 9099146935271944496}
   - {fileID: 6120820107297739640}
+  - {fileID: 2487570468942427790}
   - {fileID: 6365804242457185568}
   - {fileID: 5293205312425674427}
   - {fileID: 4154747853766558811}
@@ -393,6 +572,9 @@ MonoBehaviour:
   dashSpeed: 100
   dashDistance: 6
   dashCooldown: 1
+  allowAirDash: 1
+  allowJumpPackDash: 1
+  airDashVerticalCarry: 0.25
   defaultHeight: 2
   crouchHeight: 1
   crouchTransitionSpeed: 10
@@ -589,9 +771,9 @@ MonoBehaviour:
   moveReferenceTransform: {fileID: 9099146935271944496}
   launchUpSpeed: 14
   midAirBoostUpSpeed: 20
-  airGravity: -15
-  hoverAmplitude: 0.35
-  hoverFrequency: 2.5
+  airGravity: -30
+  hoverAmplitude: 3
+  hoverFrequency: 1.5
   hoverSmoothness: 6
   groundLayer:
     serializedVersion: 2
@@ -657,6 +839,35 @@ MonoBehaviour:
   onChet:
     m_PersistentCalls:
       m_Calls: []
+--- !u!114 &7584451691916554637
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 5361435603796722228}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 34c3348ab6caa0a4ca783dbaf43343f5, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::CuongNoSystem
+  thanhCuongNoSlider: {fileID: 0}
+  maxCuongNo: 100
+  diemMoiLanGietQuai: 5
+  heSoNhanSatThuong: 0.8
+  diemToiThieuMoiLanBiDanh: 1
+  thoiGianCuongNo: 8
+  heSoTangTocDo: 1.35
+  timeScaleCuongNo: 0.75
+  heSoBoostSatThuong: 1.5
+  satThuongCongThem: 10
+  scriptDiChuyen: {fileID: 0}
+  scriptJumpPack: {fileID: 0}
+  mauNguoiChoi: {fileID: 0}
+  hieuUngCuongNo: {fileID: 0}
+  nguonAmThanh: {fileID: 0}
+  amThanhKichHoatCuongNo: {fileID: 0}
+  amLuong: 0.9
 --- !u!1 &5502667422601066646
 GameObject:
   m_ObjectHideFlags: 0
@@ -927,17 +1138,21 @@ MonoBehaviour:
   mouseSensitivity: 2
   topClamp: 90
   bottomClamp: -90
-  enforceUniformCameraScale: 1
+  enforceUniformCameraScale: 0
   safeNearClipPlane: 0.1
   applySafeNearClipPlane: 0
   recoilSnappiness: 15
   recoilReturnSpeed: 10
-  maxRecoilPitch: 10
+  maxRecoilPitch: 5
   walkRecoilMultiplier: 3
   runRecoilMultiplier: 5
-  targetCamera: {fileID: 421954269241359649}
-  weaponCamera: {fileID: 2671973552140536834}
-  affectMainCameraFovOnFlight: 0
+  defaultShakeDuration: 0.5
+  shakeAngleMultiplier: 1.5
+  shakeFrequency: 40
+  enableTestShakeKey: 1
+  targetCamera: {fileID: 0}
+  weaponCamera: {fileID: 0}
+  affectMainCameraFovOnFlight: 1
   flightFovIncrease: 15
   fovTransitionSpeed: 10
   enableFlightShake: 1
@@ -945,15 +1160,18 @@ MonoBehaviour:
   boostShakeIntensity: 0.14
   flightShakeFrequency: 24
   flightShakeSmoothness: 10
-  enableSnakeCam: 1
-  transitionSmoothness: 1
+  enableRotationBob: 1
+  bobTransitionSmoothness: 14
+  rollAngleMultiplier: 1.6
+  yawAngleMultiplier: 0.9
+  pitchAngleMultiplier: 1
   idleFrequency: 1.5
-  idleAmount: 0.25
+  idleAngleAmount: 0.12
   walkFrequency: 5
-  walkAmount: 0.5
+  walkAngleAmount: 0.45
   runFrequency: 10
-  runAmount: 1.25
-  jumpSnakeAmount: 0.08
+  runAngleAmount: 0.85
+  jumpAngleAmount: 2
   lookAction: {fileID: -5630151704836100654, guid: 052faaac586de48259a63d0c4782560b, type: 3}
   playerBody: {fileID: 1475286881056047159}
 --- !u!1 &6502799638042767523

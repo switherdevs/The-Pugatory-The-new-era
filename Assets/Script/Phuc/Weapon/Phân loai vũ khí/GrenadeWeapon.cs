@@ -1,29 +1,59 @@
 using UnityEngine;
 using UnityEngine.InputSystem;
 
+// Component luu dan: nhan giu de nghieng ve sau & don luc (giu cang lau cang nem xa), tha nut de choi luu dan
 public class GrenadeWeapon : MonoBehaviour
 {
     [Header("1. Thong Tin Vu Khi & UI")]
     [SerializeField] private string tenHienThiVuKhi = "Frag Grenade";
     [SerializeField] private int soLuongLuuDanToiDa = 4;
     [SerializeField] private int soLuongLuuDanKhoiDau = -1;
-    [SerializeField] private float thoiGianTuHoiLuuDan = 8f;
-    [SerializeField] private float thoiGianHoiChieuNem = 0.65f;
+
+    [Tooltip("Thoi gian nghi bat buoc sau moi lan choi luu dan truoc khi duoc nem tiep (giay).")]
+    [SerializeField] private float thoiGianNghiGiuaCacLanNem = 1.25f;
 
     [Header("2. Phim Dieu Khien (New Input System)")]
     [SerializeField] private InputActionReference hanhDongNem;
     [SerializeField] private InputActionReference hanhDongHuyNem;
 
-    [Header("3. Nem & Quy Dao Luu Dan")]
+    [Header("3. Nem Xa Theo Thoi Gian Giu & Quy Dao Luu Dan")]
     [SerializeField] private Transform diemXuatPhatNem;
     [SerializeField] private GameObject prefabQuaLuuDan;
-    [SerializeField] private float tocDoNemCoBan = 20f;
-    [SerializeField] private float tocDoNemToiDa = 30f;
-    [SerializeField] private float thoiGianDonLucToiDa = 1.0f;
-    [SerializeField] private float lucDayLenParabol = 3.2f;
+
+    [Tooltip("Toc do nem khi moi nhan tha ngan (nem gan).")]
+    [SerializeField] private float tocDoNemCoBan = 14f;
+
+    [Tooltip("Toc do nem khi giu du thoi gian don luc toi da (nem rat xa).")]
+    [SerializeField] private float tocDoNemToiDa = 36f;
+
+    [Tooltip("Thoi gian giu nut can thiet de dat 100% luc nem xa toi da (giay).")]
+    [SerializeField] private float thoiGianDonLucToiDa = 1.25f;
+
+    [Tooltip("Duong cong dieu khien cam giac tang luc theo thoi gian giu (0 = moi nhan, 1 = dat luc toi da).")]
+    [SerializeField] private AnimationCurve duongCongDonLuc = AnimationCurve.EaseInOut(0f, 0f, 1f, 1f);
+
+    [Tooltip("Luc day len parabol khi nem gan (giu ngan).")]
+    [SerializeField] private float lucDayLenParabolCoBan = 2.4f;
+
+    [Tooltip("Luc day len parabol khi nem xa (giu lau) de quy dao bay cao va xa hon.")]
+    [SerializeField] private float lucDayLenParabolToiDa = 6.2f;
+
     [SerializeField] private float thoiGianNgoiNo = 2.2f;
 
-    [Header("4. Sat Thuong & Vung No")]
+    [Header("4. Hieu Ung Nghien Luu Dan Khi Nhan Giu")]
+    [Tooltip("Doi tuong mesh/vu khi luu dan se nghieng ve sau khi giu nut (neu de trong se tu dong dung chinh transform nay).")]
+    [SerializeField] private Transform doiTuongNghienLuDan;
+
+    [Tooltip("Goc nghieng ve phia sau (do) khi don luc toi da. Truc X am thuong nga ra sau theo chieu tay/sung.")]
+    [SerializeField] private Vector3 gocNghienVeSauToiDa = new Vector3(-28f, 0f, 0f);
+
+    [Tooltip("Do lui/nhac nhe (met) khi don luc toi da de tao cam giac lay da tu nhien.")]
+    [SerializeField] private Vector3 doLuiKhiLayDaToiDa = new Vector3(0f, 0.04f, -0.08f);
+
+    [Tooltip("Toc do noi suy nghieng/tra ve vi tri ban dau.")]
+    [SerializeField] private float tocDoNoiSuyNghien = 14f;
+
+    [Header("5. Sat Thuong & Vung No")]
     [SerializeField] private float satThuongTaiTamNo = 95f;
     [SerializeField] private float banKinhVungNo = 7.5f;
     [Range(0f, 1f)]
@@ -33,7 +63,7 @@ public class GrenadeWeapon : MonoBehaviour
     [SerializeField] private bool kiemTraVatCanCheKhuat = false;
     [SerializeField] private float lucDayVatLy = 12f;
 
-    [Header("5. Lien Ket Camera, Hieu Ung & Am Thanh")]
+    [Header("6. Lien Ket Camera, Hieu Ung & Am Thanh")]
     [SerializeField] private IronStormCamera scriptCamera;
     [SerializeField] private float cuongDoRungCamera = 1.2f;
     [SerializeField] private GameObject prefabHieuUngNo;
@@ -48,66 +78,111 @@ public class GrenadeWeapon : MonoBehaviour
     [Range(0f, 1f)]
     [SerializeField] private float amLuong = 0.9f;
 
-    private int currentGrenades;
-    private float lastThrowTime = -999f;
-    private float regenTimer;
-    private bool isCookingPin;
-    private float chargeTimer;
+    private int soLuongLuuDanHienTai;
+    private float thoiDiemNemGanNhat = -999f;
+    private bool dangRutChotDonLuc;
+    private float thoiGianDaDonLuc;
 
-    private InputAction runtimeThrowAction;
-    private InputAction runtimeCancelAction;
+    // Luu vi tri va goc ban dau de tra ve chinh xac sau khi tha nut nem hoac huy
+    private Vector3 viTriCucBoBanDau;
+    private Quaternion gocCucBoBanDau;
+    private bool daLuuTrangThaiGoc;
+
+    private WeaponSwitcher boChuyenVuKhi;
+    private InputAction hanhDongNemTamThoi;
+    private InputAction hanhDongHuyTamThoi;
 
     public string WeaponDisplayName => string.IsNullOrWhiteSpace(tenHienThiVuKhi) ? gameObject.name : tenHienThiVuKhi;
-    public int CurrentGrenadeCount => currentGrenades;
+    public int CurrentGrenadeCount => soLuongLuuDanHienTai;
     public int MaxGrenadeCount => soLuongLuuDanToiDa;
-    public float RemainingCooldown => Mathf.Max(0f, (lastThrowTime + thoiGianHoiChieuNem) - Time.time);
+    public bool ConLuuDan => soLuongLuuDanHienTai > 0;
+    public float ThoiGianNghiConLai => Mathf.Max(0f, (thoiDiemNemGanNhat + thoiGianNghiGiuaCacLanNem) - Time.time);
     public string ModeLabel => "GRENADE";
 
+    // Tinh ty le don luc (0..1) sau khi di qua AnimationCurve
+    public float TyLeLucNemHienTai => TinhTyLeLucNem(thoiGianDaDonLuc);
+
+    // Chuoi hien thi len WeaponUI (so luong dan + % luc nem hoac thoi gian nghi)
     public string CurrentStateLabel
     {
         get
         {
-            if (isCookingPin) return $"COOKING ({chargeTimer:0.1}s)";
-            if (currentGrenades <= 0)
+            if (dangRutChotDonLuc)
             {
-                if (thoiGianTuHoiLuuDan > 0f)
-                {
-                    float remain = Mathf.Max(0f, thoiGianTuHoiLuuDan - regenTimer);
-                    return $"0 / {soLuongLuuDanToiDa} (+{remain:0.1}s)";
-                }
-                return $"0 / {soLuongLuuDanToiDa} (EMPTY)";
+                int phanTramLuc = Mathf.RoundToInt(TyLeLucNemHienTai * 100f);
+                return $"{soLuongLuuDanHienTai} / {soLuongLuuDanToiDa} (LUC {phanTramLuc}%)";
             }
-            if (RemainingCooldown > 0.01f) return $"{currentGrenades} / {soLuongLuuDanToiDa} (CD {RemainingCooldown:0.1}s)";
-            return $"{currentGrenades} / {soLuongLuuDanToiDa}";
+
+            if (soLuongLuuDanHienTai <= 0)
+            {
+                return $"0 / {soLuongLuuDanToiDa}";
+            }
+
+            if (ThoiGianNghiConLai > 0.01f)
+            {
+                return $"{soLuongLuuDanHienTai} / {soLuongLuuDanToiDa} (NGHI {ThoiGianNghiConLai:0.1}s)";
+            }
+
+            return $"{soLuongLuuDanHienTai} / {soLuongLuuDanToiDa}";
         }
     }
 
-    private InputAction ActiveThrowAction =>
-        hanhDongNem != null && hanhDongNem.action != null ? hanhDongNem.action : runtimeThrowAction;
+    private InputAction HanhDongNemDangDung =>
+        hanhDongNem != null && hanhDongNem.action != null ? hanhDongNem.action : hanhDongNemTamThoi;
 
-    private InputAction ActiveCancelAction =>
-        hanhDongHuyNem != null && hanhDongHuyNem.action != null ? hanhDongHuyNem.action : runtimeCancelAction;
+    private InputAction HanhDongHuyDangDung =>
+        hanhDongHuyNem != null && hanhDongHuyNem.action != null ? hanhDongHuyNem.action : hanhDongHuyTamThoi;
 
     private void Awake()
     {
         soLuongLuuDanToiDa = Mathf.Max(1, soLuongLuuDanToiDa);
-        currentGrenades = soLuongLuuDanKhoiDau < 0
+        soLuongLuuDanHienTai = soLuongLuuDanKhoiDau < 0
             ? soLuongLuuDanToiDa
             : Mathf.Clamp(soLuongLuuDanKhoiDau, 0, soLuongLuuDanToiDa);
 
+        if (duongCongDonLuc == null || duongCongDonLuc.length == 0)
+        {
+            duongCongDonLuc = AnimationCurve.EaseInOut(0f, 0f, 1f, 1f);
+        }
+
         TuDongGanThanhPhan();
+        LuuTrangThaiGocNghien();
 
-        runtimeThrowAction = new InputAction("GrenadeThrow", InputActionType.Button);
-        runtimeThrowAction.AddBinding("<Mouse>/leftButton");
-        runtimeThrowAction.AddBinding("<Keyboard>/g");
+        // Khoi tao InputAction du phong khi chua gan InputActionReference tren Inspector
+        hanhDongNemTamThoi = new InputAction("GrenadeThrow", InputActionType.Button);
+        hanhDongNemTamThoi.AddBinding("<Mouse>/leftButton");
+        hanhDongNemTamThoi.AddBinding("<Keyboard>/g");
 
-        runtimeCancelAction = new InputAction("GrenadeCancel", InputActionType.Button);
-        runtimeCancelAction.AddBinding("<Mouse>/rightButton");
-        runtimeCancelAction.AddBinding("<Keyboard>/r");
+        hanhDongHuyTamThoi = new InputAction("GrenadeCancel", InputActionType.Button);
+        hanhDongHuyTamThoi.AddBinding("<Mouse>/rightButton");
+        hanhDongHuyTamThoi.AddBinding("<Keyboard>/r");
+    }
+
+    private void Start()
+    {
+        if (soLuongLuuDanHienTai <= 0)
+        {
+            XuLyKhiHetLuuDan();
+        }
     }
 
     private void TuDongGanThanhPhan()
     {
+        if (boChuyenVuKhi == null)
+        {
+            boChuyenVuKhi = GetComponentInParent<WeaponSwitcher>();
+            if (boChuyenVuKhi == null)
+            {
+                boChuyenVuKhi = FindFirstObjectByType<WeaponSwitcher>();
+            }
+        }
+
+        if (doiTuongNghienLuDan == null)
+        {
+            Transform goiYModel = TimChildTheoTuKhoa(transform, "mesh", "model", "grenade", "body", "visual");
+            doiTuongNghienLuDan = goiYModel != null ? goiYModel : transform;
+        }
+
         if (diemXuatPhatNem == null)
         {
             diemXuatPhatNem = TimChildTheoTuKhoa(transform, "throw", "muzzle", "hand", "grenade", "origin");
@@ -137,19 +212,57 @@ public class GrenadeWeapon : MonoBehaviour
         }
     }
 
-    private Transform TimChildTheoTuKhoa(Transform parent, params string[] keywords)
+    private void LuuTrangThaiGocNghien()
     {
-        Transform[] children = parent.GetComponentsInChildren<Transform>(true);
-        for (int i = 0; i < children.Length; i++)
+        if (daLuuTrangThaiGoc || doiTuongNghienLuDan == null) return;
+        viTriCucBoBanDau = doiTuongNghienLuDan.localPosition;
+        gocCucBoBanDau = doiTuongNghienLuDan.localRotation;
+        daLuuTrangThaiGoc = true;
+    }
+
+    // Goi khi vu khi duoc gan vao holder moi de dong bo trang thai goc chinh xac
+    public void DongBoTrangThaiSauKhiGanHolder(Vector3 viTriHolder, Quaternion gocHolder)
+    {
+        dangRutChotDonLuc = false;
+        thoiGianDaDonLuc = 0f;
+
+        if (doiTuongNghienLuDan == null)
         {
-            Transform child = children[i];
-            if (child == null || child == parent) continue;
-            string lowerName = child.name.ToLowerInvariant();
-            for (int j = 0; j < keywords.Length; j++)
+            TuDongGanThanhPhan();
+        }
+
+        if (doiTuongNghienLuDan != null)
+        {
+            if (doiTuongNghienLuDan == transform)
             {
-                if (lowerName.Contains(keywords[j]))
+                viTriCucBoBanDau = viTriHolder;
+                gocCucBoBanDau = gocHolder;
+                daLuuTrangThaiGoc = true;
+                doiTuongNghienLuDan.localPosition = viTriCucBoBanDau;
+                doiTuongNghienLuDan.localRotation = gocCucBoBanDau;
+            }
+            else
+            {
+                viTriCucBoBanDau = doiTuongNghienLuDan.localPosition;
+                gocCucBoBanDau = doiTuongNghienLuDan.localRotation;
+                daLuuTrangThaiGoc = true;
+            }
+        }
+    }
+
+    private Transform TimChildTheoTuKhoa(Transform cha, params string[] tuKhoa)
+    {
+        Transform[] danhSachCon = cha.GetComponentsInChildren<Transform>(true);
+        for (int i = 0; i < danhSachCon.Length; i++)
+        {
+            Transform con = danhSachCon[i];
+            if (con == null || con == cha) continue;
+            string tenThuong = con.name.ToLowerInvariant();
+            for (int j = 0; j < tuKhoa.Length; j++)
+            {
+                if (tenThuong.Contains(tuKhoa[j]))
                 {
-                    return child;
+                    return con;
                 }
             }
         }
@@ -159,147 +272,197 @@ public class GrenadeWeapon : MonoBehaviour
     private void OnEnable()
     {
         TuDongGanThanhPhan();
-        ActiveThrowAction?.Enable();
-        ActiveCancelAction?.Enable();
+        LuuTrangThaiGocNghien();
+        TraVeTrangThaiGocNghien(tucThi: true);
+        HanhDongNemDangDung?.Enable();
+        HanhDongHuyDangDung?.Enable();
     }
 
     private void OnDisable()
     {
-        isCookingPin = false;
-        chargeTimer = 0f;
-        ActiveThrowAction?.Disable();
-        ActiveCancelAction?.Disable();
+        dangRutChotDonLuc = false;
+        thoiGianDaDonLuc = 0f;
+        TraVeTrangThaiGocNghien(tucThi: true);
+        HanhDongNemDangDung?.Disable();
+        HanhDongHuyDangDung?.Disable();
     }
 
     private void OnDestroy()
     {
-        runtimeThrowAction?.Dispose();
-        runtimeCancelAction?.Dispose();
+        TraVeTrangThaiGocNghien(tucThi: true);
+        hanhDongNemTamThoi?.Dispose();
+        hanhDongHuyTamThoi?.Dispose();
     }
 
     private void Update()
     {
-        HandleAutoRegen();
-
         if (!gameObject.activeInHierarchy || !enabled)
         {
-            isCookingPin = false;
-            chargeTimer = 0f;
+            dangRutChotDonLuc = false;
+            thoiGianDaDonLuc = 0f;
+            TraVeTrangThaiGocNghien(tucThi: true);
             return;
         }
 
-        ActiveThrowAction?.Enable();
-        ActiveCancelAction?.Enable();
-
-        bool pressedThrow = ActiveThrowAction != null && ActiveThrowAction.WasPressedThisFrame();
-        bool heldThrow = ActiveThrowAction != null && ActiveThrowAction.IsPressed();
-        bool pressedCancel = ActiveCancelAction != null && ActiveCancelAction.WasPressedThisFrame();
-
-        if (isCookingPin && pressedCancel)
+        if (soLuongLuuDanHienTai <= 0)
         {
-            CancelCooking();
+            XuLyKhiHetLuuDan();
             return;
         }
 
-        if (!isCookingPin && pressedThrow && CanStartThrow())
-        {
-            isCookingPin = true;
-            chargeTimer = 0f;
-            PlayClip(amThanhRutChot);
-        }
-        else if (isCookingPin)
-        {
-            chargeTimer += Time.deltaTime;
+        HanhDongNemDangDung?.Enable();
+        HanhDongHuyDangDung?.Enable();
 
-            if (!heldThrow)
+        bool vuaNhanNem = HanhDongNemDangDung != null && HanhDongNemDangDung.WasPressedThisFrame();
+        bool dangGiuNem = HanhDongNemDangDung != null && HanhDongNemDangDung.IsPressed();
+        bool vuaNhanHuy = HanhDongHuyDangDung != null && HanhDongHuyDangDung.WasPressedThisFrame();
+
+        // Neu dang giu luu dan ma nhan huy thi huy va tra lai goc/vi tri ban dau
+        if (dangRutChotDonLuc && vuaNhanHuy)
+        {
+            HuyDonLucNem();
+            CapNhatHieuUngNghienLuDan();
+            return;
+        }
+
+        // Bat dau rut chot khi da het thoi gian nghi sau lan nem truoc
+        if (!dangRutChotDonLuc && vuaNhanNem && CoTheBatDauNem())
+        {
+            dangRutChotDonLuc = true;
+            thoiGianDaDonLuc = 0f;
+            PhatAmThanh(amThanhRutChot);
+        }
+        else if (dangRutChotDonLuc)
+        {
+            // Cong dồn thoi gian giu (gioi han toi da bang thoiGianDonLucToiDa de khong lech thoi gian khi tha)
+            thoiGianDaDonLuc = Mathf.Min(thoiGianDonLucToiDa, thoiGianDaDonLuc + Time.deltaTime);
+
+            // Khi tha nut nem -> choi luu dan voi luc tuong ung thoi gian da giu
+            if (!dangGiuNem)
             {
-                ExecuteThrow(chargeTimer);
-                isCookingPin = false;
-                chargeTimer = 0f;
+                ThucHienChoiLuuDan(thoiGianDaDonLuc);
+                dangRutChotDonLuc = false;
+                thoiGianDaDonLuc = 0f;
+                TraVeTrangThaiGocNghien(tucThi: false);
             }
         }
+
+        CapNhatHieuUngNghienLuDan();
     }
 
-    private bool CanStartThrow()
+    // Quy doi thoi gian da giu (giay) sang ty le luc (0..1) theo duong cong don luc
+    private float TinhTyLeLucNem(float thoiGianGiu)
     {
-        return currentGrenades > 0 && Time.time >= lastThrowTime + thoiGianHoiChieuNem;
+        if (thoiGianDonLucToiDa <= 0.001f) return 1f;
+        float tyLeTho = Mathf.Clamp01(thoiGianGiu / thoiGianDonLucToiDa);
+        return duongCongDonLuc != null ? Mathf.Clamp01(duongCongDonLuc.Evaluate(tyLeTho)) : tyLeTho;
     }
 
-    private void CancelCooking()
+    // Dieu khien do nghieng ve sau theo muc do giu nut (0 -> 1)
+    private void CapNhatHieuUngNghienLuDan()
     {
-        isCookingPin = false;
-        chargeTimer = 0f;
-        PlayClip(amThanhHuy);
-    }
+        if (doiTuongNghienLuDan == null) return;
+        if (!daLuuTrangThaiGoc) LuuTrangThaiGocNghien();
 
-    private void HandleAutoRegen()
-    {
-        if (thoiGianTuHoiLuuDan <= 0f || currentGrenades >= soLuongLuuDanToiDa)
+        float mucDoDonLuc = 0f;
+        if (dangRutChotDonLuc)
         {
-            regenTimer = 0f;
+            // Giu muc toi thieu 0.2f ngay khi vua nhan, sau do tang dan theo thoi gian giu
+            mucDoDonLuc = Mathf.Lerp(0.2f, 1f, TyLeLucNemHienTai);
+        }
+
+        Quaternion gocDich = gocCucBoBanDau * Quaternion.Euler(gocNghienVeSauToiDa * mucDoDonLuc);
+        Vector3 viTriDich = viTriCucBoBanDau + (doLuiKhiLayDaToiDa * mucDoDonLuc);
+
+        float buocNoiSuy = 1f - Mathf.Exp(-tocDoNoiSuyNghien * Time.deltaTime);
+        doiTuongNghienLuDan.localRotation = Quaternion.Slerp(doiTuongNghienLuDan.localRotation, gocDich, buocNoiSuy);
+        doiTuongNghienLuDan.localPosition = Vector3.Lerp(doiTuongNghienLuDan.localPosition, viTriDich, buocNoiSuy);
+    }
+
+    // Tra ve vi tri va goc ban dau
+    private void TraVeTrangThaiGocNghien(bool tucThi)
+    {
+        if (!daLuuTrangThaiGoc || doiTuongNghienLuDan == null) return;
+
+        if (tucThi)
+        {
+            doiTuongNghienLuDan.localRotation = gocCucBoBanDau;
+            doiTuongNghienLuDan.localPosition = viTriCucBoBanDau;
             return;
         }
 
-        regenTimer += Time.deltaTime;
-        if (regenTimer >= thoiGianTuHoiLuuDan)
-        {
-            regenTimer = 0f;
-            currentGrenades = Mathf.Min(soLuongLuuDanToiDa, currentGrenades + 1);
-        }
+        float buocNoiSuy = 1f - Mathf.Exp(-tocDoNoiSuyNghien * Time.deltaTime);
+        doiTuongNghienLuDan.localRotation = Quaternion.Slerp(doiTuongNghienLuDan.localRotation, gocCucBoBanDau, buocNoiSuy);
+        doiTuongNghienLuDan.localPosition = Vector3.Lerp(doiTuongNghienLuDan.localPosition, viTriCucBoBanDau, buocNoiSuy);
     }
 
-    private void ExecuteThrow(float heldDuration)
+    private bool CoTheBatDauNem()
     {
-        if (!CanStartThrow()) return;
+        return soLuongLuuDanHienTai > 0 && Time.time >= thoiDiemNemGanNhat + thoiGianNghiGiuaCacLanNem;
+    }
 
-        currentGrenades = Mathf.Max(0, currentGrenades - 1);
-        lastThrowTime = Time.time;
-        PlayClip(amThanhNem);
+    private void HuyDonLucNem()
+    {
+        dangRutChotDonLuc = false;
+        thoiGianDaDonLuc = 0f;
+        PhatAmThanh(amThanhHuy);
+    }
 
-        Transform origin = diemXuatPhatNem != null ? diemXuatPhatNem : transform;
-        Vector3 spawnPos = origin.position + origin.forward * 0.35f;
+    private void ThucHienChoiLuuDan(float thoiGianGiu)
+    {
+        if (!CoTheBatDauNem()) return;
 
-        Vector3 aimDirection = GetThrowDirection(origin);
-        float chargeRatio = thoiGianDonLucToiDa > 0.001f ? Mathf.Clamp01(heldDuration / thoiGianDonLucToiDa) : 0f;
-        float speed = Mathf.Lerp(tocDoNemCoBan, tocDoNemToiDa, chargeRatio);
-        Vector3 initialVelocity = aimDirection * speed + Vector3.up * lucDayLenParabol;
+        soLuongLuuDanHienTai = Mathf.Max(0, soLuongLuuDanHienTai - 1);
+        thoiDiemNemGanNhat = Time.time;
+        PhatAmThanh(amThanhNem);
 
-        GameObject grenadeObj;
+        Transform diemGoc = diemXuatPhatNem != null ? diemXuatPhatNem : transform;
+        Vector3 viTriSinh = diemGoc.position + diemGoc.forward * 0.35f;
+
+        Vector3 huongNem = LayHuongNem(diemGoc);
+        float tyLeDonLuc = TinhTyLeLucNem(thoiGianGiu);
+
+        // Giu cang lau -> toc do bay cang lon va luc day parabol cang cao de nem xa hon
+        float tocDoNem = Mathf.Lerp(tocDoNemCoBan, tocDoNemToiDa, tyLeDonLuc);
+        float lucDayLen = Mathf.Lerp(lucDayLenParabolCoBan, lucDayLenParabolToiDa, tyLeDonLuc);
+        Vector3 vanTocDau = huongNem * tocDoNem + Vector3.up * lucDayLen;
+
+        GameObject quaLuuDanObj;
         if (prefabQuaLuuDan != null)
         {
-            grenadeObj = Instantiate(prefabQuaLuuDan, spawnPos, Quaternion.LookRotation(aimDirection, Vector3.up));
+            quaLuuDanObj = Instantiate(prefabQuaLuuDan, viTriSinh, Quaternion.LookRotation(huongNem, Vector3.up));
         }
         else
         {
-            grenadeObj = GameObject.CreatePrimitive(PrimitiveType.Sphere);
-            grenadeObj.name = "ThrownGrenade";
-            grenadeObj.transform.position = spawnPos;
-            grenadeObj.transform.localScale = Vector3.one * 0.22f;
+            quaLuuDanObj = GameObject.CreatePrimitive(PrimitiveType.Sphere);
+            quaLuuDanObj.name = "ThrownGrenade";
+            quaLuuDanObj.transform.position = viTriSinh;
+            quaLuuDanObj.transform.localScale = Vector3.one * 0.22f;
         }
 
-        Rigidbody rb = grenadeObj.GetComponent<Rigidbody>();
+        Rigidbody rb = quaLuuDanObj.GetComponent<Rigidbody>();
         if (rb == null)
         {
-            rb = grenadeObj.AddComponent<Rigidbody>();
+            rb = quaLuuDanObj.AddComponent<Rigidbody>();
         }
         rb.collisionDetectionMode = CollisionDetectionMode.ContinuousDynamic;
-        rb.linearVelocity = initialVelocity;
+        rb.linearVelocity = vanTocDau;
         rb.AddTorque(Random.insideUnitSphere * 12f, ForceMode.Impulse);
 
-        DamageDealer dealer = grenadeObj.GetComponent<DamageDealer>();
-        if (dealer != null)
+        DamageDealer nguoiGaySatThuong = quaLuuDanObj.GetComponent<DamageDealer>();
+        if (nguoiGaySatThuong != null)
         {
-            dealer.SetOwner(transform.root);
-            dealer.SetDamage(satThuongTaiTamNo);
+            nguoiGaySatThuong.SetOwner(transform.root);
+            nguoiGaySatThuong.SetDamage(satThuongTaiTamNo);
         }
 
-        ThrownGrenadeProjectile projectile = grenadeObj.GetComponent<ThrownGrenadeProjectile>();
-        if (projectile == null)
+        ThrownGrenadeProjectile vienLuuDan = quaLuuDanObj.GetComponent<ThrownGrenadeProjectile>();
+        if (vienLuuDan == null)
         {
-            projectile = grenadeObj.AddComponent<ThrownGrenadeProjectile>();
+            vienLuuDan = quaLuuDanObj.AddComponent<ThrownGrenadeProjectile>();
         }
 
-        projectile.Initialize(
+        vienLuuDan.Initialize(
             transform.root,
             thoiGianNgoiNo,
             satThuongTaiTamNo,
@@ -316,9 +479,39 @@ public class GrenadeWeapon : MonoBehaviour
             amThanhNo,
             amLuong
         );
+
+        // Neu vua nem het qua luu dan cuoi cung -> an GameObject va chuyen select ve index 0
+        if (soLuongLuuDanHienTai <= 0)
+        {
+            XuLyKhiHetLuuDan();
+        }
     }
 
-    private Vector3 GetThrowDirection(Transform origin)
+    // An GameObject luu dan va yeu cau WeaponSwitcher chuyen select sang index 0
+    private void XuLyKhiHetLuuDan()
+    {
+        dangRutChotDonLuc = false;
+        thoiGianDaDonLuc = 0f;
+        TraVeTrangThaiGocNghien(tucThi: true);
+
+        if (boChuyenVuKhi == null)
+        {
+            boChuyenVuKhi = GetComponentInParent<WeaponSwitcher>();
+            if (boChuyenVuKhi == null)
+            {
+                boChuyenVuKhi = FindFirstObjectByType<WeaponSwitcher>();
+            }
+        }
+
+        gameObject.SetActive(false);
+
+        if (boChuyenVuKhi != null)
+        {
+            boChuyenVuKhi.XuLyKhiHetLuuDanChuyenVeIndex0();
+        }
+    }
+
+    private Vector3 LayHuongNem(Transform diemGoc)
     {
         Camera cam = null;
         if (scriptCamera != null)
@@ -336,28 +529,28 @@ public class GrenadeWeapon : MonoBehaviour
 
         if (cam != null)
         {
-            Ray ray = cam.ViewportPointToRay(new Vector3(0.5f, 0.5f, 0f));
-            Vector3 targetPoint = Physics.Raycast(ray, out RaycastHit hit, 120f, ~0, QueryTriggerInteraction.Ignore)
+            Ray tiaNgam = cam.ViewportPointToRay(new Vector3(0.5f, 0.5f, 0f));
+            Vector3 diemMucTieu = Physics.Raycast(tiaNgam, out RaycastHit hit, 120f, ~0, QueryTriggerInteraction.Ignore)
                 ? hit.point
-                : ray.GetPoint(40f);
+                : tiaNgam.GetPoint(40f);
 
-            Vector3 dir = targetPoint - origin.position;
-            if (dir.sqrMagnitude > 0.001f)
+            Vector3 huong = diemMucTieu - diemGoc.position;
+            if (huong.sqrMagnitude > 0.001f)
             {
-                return dir.normalized;
+                return huong.normalized;
             }
         }
 
-        return origin.forward.normalized;
+        return diemGoc.forward.normalized;
     }
 
-    public void AddGrenades(int amount)
+    public void AddGrenades(int soLuongThem)
     {
-        if (amount <= 0) return;
-        currentGrenades = Mathf.Clamp(currentGrenades + amount, 0, soLuongLuuDanToiDa);
+        if (soLuongThem <= 0) return;
+        soLuongLuuDanHienTai = Mathf.Clamp(soLuongLuuDanHienTai + soLuongThem, 0, soLuongLuuDanToiDa);
     }
 
-    private void PlayClip(AudioClip clip)
+    private void PhatAmThanh(AudioClip clip)
     {
         if (clip != null && nguonAmThanh != null)
         {
@@ -367,152 +560,155 @@ public class GrenadeWeapon : MonoBehaviour
 
     private void OnDrawGizmosSelected()
     {
-        Vector3 center = diemXuatPhatNem != null ? diemXuatPhatNem.position : transform.position;
+        Vector3 tam = diemXuatPhatNem != null ? diemXuatPhatNem.position : transform.position;
         Gizmos.color = new Color(1f, 0.35f, 0.05f, 0.25f);
-        Gizmos.DrawWireSphere(center, banKinhVungNo);
+        Gizmos.DrawWireSphere(tam, banKinhVungNo);
     }
 }
 
 public class ThrownGrenadeProjectile : MonoBehaviour
 {
-    private Transform ownerRoot;
-    private float fuseTimer;
-    private float damage;
-    private float radius;
-    private float edgeMultiplier;
-    private LayerMask damageLayers;
-    private LayerMask obstacleMask;
-    private bool checkLineOfSight;
-    private float pushForce;
+    private static readonly Collider[] boDemVaChamNo = new Collider[32];
 
-    private IronStormCamera camScript;
-    private float shakeIntensity;
+    private Transform gocChuSoHuu;
+    private float boDemNgoiNo;
+    private float satThuongGoc;
+    private float banKinhNo;
+    private float heSoRiaNo;
+    private LayerMask lopNhanSatThuong;
+    private LayerMask lopVatCan;
+    private bool kiemTraCheKhuat;
+    private float lucDay;
 
-    private GameObject vfxPrefab;
-    private float vfxLifetime;
-    private AudioClip sfxClip;
-    private float volume;
+    private IronStormCamera scriptCamera;
+    private float cuongDoRung;
 
-    private bool initialized;
-    private bool exploded;
+    private GameObject prefabHieuUng;
+    private float thoiGianHuyHieuUng;
+    private AudioClip amThanhNo;
+    private float amLuong;
+
+    private bool daKhoiTao;
+    private bool daNo;
 
     public void Initialize(
-        Transform owner,
-        float fuse,
-        float explosionDamage,
-        float explosionRadius,
-        float edgeDamageMul,
-        LayerMask targetLayers,
-        LayerMask blockLayers,
-        bool useLosCheck,
-        float explosionPush,
-        IronStormCamera cameraRef,
-        float camShakeInt,
-        GameObject effectPrefab,
-        float effectLife,
-        AudioClip explosionAudio,
-        float audioVol)
+        Transform chuSoHuu,
+        float thoiGianNgoi,
+        float satThuongTam,
+        float banKinhVung,
+        float heSoSatThuongRia,
+        LayerMask lopMucTieu,
+        LayerMask lopChan,
+        bool suDungKiemTraCheKhuat,
+        float lucDayNo,
+        IronStormCamera cameraThamChieu,
+        float cuongDoRungCam,
+        GameObject hieuUngPrefab,
+        float thoiGianSongHieuUng,
+        AudioClip clipNo,
+        float amLuongClip)
     {
-        ownerRoot = owner;
-        fuseTimer = Mathf.Max(0.05f, fuse);
-        damage = Mathf.Max(0f, explosionDamage);
-        radius = Mathf.Max(0.2f, explosionRadius);
-        edgeMultiplier = Mathf.Clamp01(edgeDamageMul);
-        damageLayers = targetLayers;
-        obstacleMask = blockLayers;
-        checkLineOfSight = useLosCheck;
-        pushForce = Mathf.Max(0f, explosionPush);
+        gocChuSoHuu = chuSoHuu;
+        boDemNgoiNo = Mathf.Max(0.05f, thoiGianNgoi);
+        satThuongGoc = Mathf.Max(0f, satThuongTam);
+        banKinhNo = Mathf.Max(0.2f, banKinhVung);
+        heSoRiaNo = Mathf.Clamp01(heSoSatThuongRia);
+        lopNhanSatThuong = lopMucTieu;
+        lopVatCan = lopChan;
+        kiemTraCheKhuat = suDungKiemTraCheKhuat;
+        lucDay = Mathf.Max(0f, lucDayNo);
 
-        camScript = cameraRef;
-        shakeIntensity = camShakeInt;
+        scriptCamera = cameraThamChieu;
+        cuongDoRung = cuongDoRungCam;
 
-        vfxPrefab = effectPrefab;
-        vfxLifetime = Mathf.Max(0.1f, effectLife);
-        sfxClip = explosionAudio;
-        volume = Mathf.Clamp01(audioVol);
+        prefabHieuUng = hieuUngPrefab;
+        thoiGianHuyHieuUng = Mathf.Max(0.1f, thoiGianSongHieuUng);
+        amThanhNo = clipNo;
+        amLuong = Mathf.Clamp01(amLuongClip);
 
-        initialized = true;
+        daKhoiTao = true;
     }
 
     private void Update()
     {
-        if (!initialized || exploded) return;
+        if (!daKhoiTao || daNo) return;
 
-        fuseTimer -= Time.deltaTime;
-        if (fuseTimer <= 0f)
+        boDemNgoiNo -= Time.deltaTime;
+        if (boDemNgoiNo <= 0f)
         {
-            Explode();
+            PhatNo();
         }
     }
 
-    private void Explode()
+    private void PhatNo()
     {
-        if (exploded) return;
-        exploded = true;
+        if (daNo) return;
+        daNo = true;
 
-        Vector3 blastPos = transform.position;
+        Vector3 viTriNo = transform.position;
 
-        if (vfxPrefab != null)
+        if (prefabHieuUng != null)
         {
-            GameObject vfx = Instantiate(vfxPrefab, blastPos, Quaternion.identity);
-            Destroy(vfx, vfxLifetime);
+            GameObject hieuUng = Instantiate(prefabHieuUng, viTriNo, Quaternion.identity);
+            Destroy(hieuUng, thoiGianHuyHieuUng);
         }
 
-        if (sfxClip != null)
+        if (amThanhNo != null)
         {
-            AudioSource.PlayClipAtPoint(sfxClip, blastPos, volume);
+            AudioSource.PlayClipAtPoint(amThanhNo, viTriNo, amLuong);
         }
 
-        if (camScript != null && shakeIntensity > 0f)
+        if (scriptCamera != null && cuongDoRung > 0f)
         {
-            camScript.SendMessage("AddShootShake", shakeIntensity, SendMessageOptions.DontRequireReceiver);
+            scriptCamera.SendMessage("AddShootShake", cuongDoRung, SendMessageOptions.DontRequireReceiver);
         }
 
-        Collider[] hits = Physics.OverlapSphere(blastPos, radius, damageLayers, QueryTriggerInteraction.Ignore);
-        System.Collections.Generic.HashSet<HealthSystem> damagedHealths = new System.Collections.Generic.HashSet<HealthSystem>();
+        int soLuongVaCham = Physics.OverlapSphereNonAlloc(viTriNo, banKinhNo, boDemVaChamNo, lopNhanSatThuong, QueryTriggerInteraction.Ignore);
+        System.Collections.Generic.HashSet<HealthSystem> daGaySatThuong = new System.Collections.Generic.HashSet<HealthSystem>();
 
-        foreach (Collider hit in hits)
+        for (int i = 0; i < soLuongVaCham; i++)
         {
-            if (hit == null) continue;
+            Collider vaCham = boDemVaChamNo[i];
+            if (vaCham == null) continue;
 
-            if (ownerRoot != null && hit.transform.root == ownerRoot)
+            if (gocChuSoHuu != null && vaCham.transform.root == gocChuSoHuu)
             {
                 continue;
             }
 
-            Vector3 closestPoint = hit.ClosestPoint(blastPos);
-            float dist = Vector3.Distance(blastPos, closestPoint);
-            if (dist > radius) continue;
+            Vector3 diemGanNhat = vaCham.ClosestPoint(viTriNo);
+            float khoangCach = Vector3.Distance(viTriNo, diemGanNhat);
+            if (khoangCach > banKinhNo) continue;
 
-            if (checkLineOfSight && obstacleMask != 0)
+            if (kiemTraCheKhuat && lopVatCan != 0)
             {
-                Vector3 dir = closestPoint - blastPos;
-                float rayDist = dir.magnitude;
-                if (rayDist > 0.01f && Physics.Raycast(blastPos, dir / rayDist, rayDist, obstacleMask, QueryTriggerInteraction.Ignore))
+                Vector3 huong = diemGanNhat - viTriNo;
+                float doDaiTia = huong.magnitude;
+                if (doDaiTia > 0.01f && Physics.Raycast(viTriNo, huong / doDaiTia, doDaiTia, lopVatCan, QueryTriggerInteraction.Ignore))
                 {
                     continue;
                 }
             }
 
-            HealthSystem health = hit.GetComponentInParent<HealthSystem>();
-            if (health != null && !health.DaChet && health.Phe == HealthSystem.LoaiDoiTuong.QuaiVat && !damagedHealths.Contains(health))
+            HealthSystem heThongMau = vaCham.GetComponentInParent<HealthSystem>();
+            if (heThongMau != null && !heThongMau.DaChet && heThongMau.Phe == HealthSystem.LoaiDoiTuong.QuaiVat && !daGaySatThuong.Contains(heThongMau))
             {
-                damagedHealths.Add(health);
+                daGaySatThuong.Add(heThongMau);
 
-                float falloff = 1f - Mathf.Clamp01(dist / radius);
-                float damageFactor = Mathf.Lerp(edgeMultiplier, 1f, falloff);
-                float finalDamage = damage * damageFactor;
+                float tyLeGiamDan = 1f - Mathf.Clamp01(khoangCach / banKinhNo);
+                float heSoSatThuong = Mathf.Lerp(heSoRiaNo, 1f, tyLeGiamDan);
+                float satThuongCuoi = satThuongGoc * heSoSatThuong;
 
-                if (finalDamage > 0f)
+                if (satThuongCuoi > 0f)
                 {
-                    health.NhanSatThuong(finalDamage);
+                    heThongMau.NhanSatThuong(satThuongCuoi);
                 }
             }
 
-            Rigidbody targetRb = hit.GetComponentInParent<Rigidbody>();
-            if (targetRb != null && !targetRb.isKinematic && pushForce > 0f)
+            Rigidbody rbMucTieu = vaCham.GetComponentInParent<Rigidbody>();
+            if (rbMucTieu != null && !rbMucTieu.isKinematic && lucDay > 0f)
             {
-                targetRb.AddExplosionForce(pushForce, blastPos, radius, 0.5f, ForceMode.Impulse);
+                rbMucTieu.AddExplosionForce(lucDay, viTriNo, banKinhNo, 0.5f, ForceMode.Impulse);
             }
         }
 

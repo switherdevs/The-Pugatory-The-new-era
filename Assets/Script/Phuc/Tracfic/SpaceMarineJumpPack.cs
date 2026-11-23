@@ -429,6 +429,31 @@ public class SpaceMarineJumpPack : MonoBehaviour
         return forward.normalized;
     }
 
+    private Vector3 LayHuongDashUuTien(Vector2 moveInput, Vector3 fallbackMoveDir)
+    {
+        if (moveInput.sqrMagnitude > 0.01f)
+        {
+            Vector3 forward = GetHorizontalBasisForward();
+            Vector3 right = new Vector3(forward.z, 0f, -forward.x).normalized;
+            Vector3 dir = right * moveInput.x + forward * moveInput.y;
+            dir.y = 0f;
+            if (dir.sqrMagnitude > 0.001f)
+            {
+                return dir.normalized;
+            }
+        }
+
+        Vector3 fallback = fallbackMoveDir;
+        fallback.y = 0f;
+        if (fallback.sqrMagnitude > 0.001f)
+        {
+            return fallback.normalized;
+        }
+
+        Vector3 camForward = GetHorizontalBasisForward();
+        return camForward.sqrMagnitude > 0.001f ? camForward : transform.forward.normalized;
+    }
+
     private void ApplyAirControllerMovement()
     {
         if (controller == null || !controller.enabled) return;
@@ -441,7 +466,9 @@ public class SpaceMarineJumpPack : MonoBehaviour
         Vector3 moveDir = right * moveInput.x + forward * moveInput.y;
         moveDir = Vector3.ClampMagnitude(moveDir, 1f);
 
-        if (movementScript != null && movementScript.TryStepJumpPackDash(Time.deltaTime, moveDir))
+        Vector3 huongDash = LayHuongDashUuTien(moveInput, moveDir);
+
+        if (movementScript != null && movementScript.TryStepJumpPackDash(Time.deltaTime, huongDash))
         {
             currentHorizontalVelocity = moveDir.sqrMagnitude > 0.01f ? moveDir.normalized * airMoveSpeed : Vector3.zero;
             if (isHovering)
@@ -451,7 +478,8 @@ public class SpaceMarineJumpPack : MonoBehaviour
             }
             else
             {
-                currentVerticalVelocity += airGravity * 0.25f * Time.deltaTime;
+                float heSoRoi = currentVerticalVelocity < 0f ? movementScript.AirDashVerticalCarry : 0.25f;
+                currentVerticalVelocity += airGravity * heSoRoi * Time.deltaTime;
                 controller.Move(new Vector3(0f, currentVerticalVelocity * Time.deltaTime, 0f));
             }
             return;
