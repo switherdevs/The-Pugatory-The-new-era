@@ -189,6 +189,7 @@ public class GrappleHook : MonoBehaviour
     private bool isPullingToStand = false;
     private bool isVaultJumpingUp = false;
     private bool hasReachedAnchor = false;
+    private bool tookControlOfMovement = false;
 
     private Vector3 grapplePoint;
     private Vector3 currentHookTipPos;
@@ -388,11 +389,6 @@ public class GrappleHook : MonoBehaviour
         hasSmoothedLineStart = false;
         transform.localRotation = initialLocalRotation;
 
-        if (jumpPackScript != null && !jumpPackScript.enabled)
-        {
-            jumpPackScript.enabled = true;
-        }
-
         ActiveGrappleAction?.Disable();
         ActiveMoveAction?.Disable();
         ActivePullToStandAction?.Disable();
@@ -530,17 +526,20 @@ public class GrappleHook : MonoBehaviour
         }
         else
         {
-            if (jumpPackScript != null && !jumpPackScript.enabled)
+            if (tookControlOfMovement)
             {
-                jumpPackScript.enabled = true;
+                tookControlOfMovement = false;
+                if (jumpPackScript != null && !jumpPackScript.enabled)
+                {
+                    jumpPackScript.enabled = true;
+                }
+                if (movementScript != null && (jumpPackScript == null || !jumpPackScript.IsJumpPackActive))
+                {
+                    movementScript.enabled = true;
+                }
             }
 
             transform.localRotation = Quaternion.Slerp(transform.localRotation, initialLocalRotation, gunAimSpeed * dt);
-
-            if (movementScript != null && !movementScript.enabled)
-            {
-                movementScript.enabled = true;
-            }
         }
     }
 
@@ -715,6 +714,7 @@ public class GrappleHook : MonoBehaviour
             return;
         }
 
+        tookControlOfMovement = true;
         if (movementScript != null && movementScript.enabled)
         {
             movementScript.enabled = false;
@@ -1030,14 +1030,17 @@ public class GrappleHook : MonoBehaviour
             audioSource.PlayOneShot(detachHookClip, audioVolume);
         }
 
-        if (jumpPackScript != null && !jumpPackScript.enabled)
+        if (tookControlOfMovement)
         {
-            jumpPackScript.enabled = true;
-        }
-
-        if (movementScript != null)
-        {
-            movementScript.enabled = true;
+            tookControlOfMovement = false;
+            if (jumpPackScript != null && !jumpPackScript.enabled)
+            {
+                jumpPackScript.enabled = true;
+            }
+            if (movementScript != null && (jumpPackScript == null || !jumpPackScript.IsJumpPackActive))
+            {
+                movementScript.enabled = true;
+            }
         }
     }
 
@@ -1064,6 +1067,7 @@ public class GrappleHook : MonoBehaviour
                 currentHookTipPos = grapplePoint;
                 isHookAttached = true;
 
+                tookControlOfMovement = true;
                 if (movementScript != null && movementScript.enabled)
                 {
                     movementScript.enabled = false;

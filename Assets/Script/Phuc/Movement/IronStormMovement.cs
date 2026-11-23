@@ -27,6 +27,16 @@ public class IronStormMovement : MonoBehaviour
     [Tooltip("Thời gian hồi chiêu trước khi được dùng né tiếp theo (giây).")]
     [SerializeField] private float dashCooldown = 2f;
 
+    [Tooltip("Cho phép thực hiện Dash khi đang nhảy / trên không.")]
+    [SerializeField] private bool allowAirDash = true;
+
+    [Tooltip("Cho phép thực hiện Dash khi đang bay bằng Jump Pack.")]
+    [SerializeField] private bool allowJumpPackDash = true;
+
+    [Tooltip("Hệ số duy trì vận tốc rơi khi Dash trên không (0 = giữ ngang, 0.3 = rơi nhẹ).")]
+    [Range(0f, 1f)]
+    [SerializeField] private float airDashVerticalCarry = 0.25f;
+
     [Header("Crouch Settings")]
     [Tooltip("Chiều cao mặc định của CharacterController khi đứng.")]
     [SerializeField] private float defaultHeight = 2.0f;
@@ -99,6 +109,7 @@ public class IronStormMovement : MonoBehaviour
     public bool IsCrouching => isCrouching;
     public bool IsGrounded => isGrounded;
     public bool IsDashing => isDashing;
+    public bool CanDashNow => !isDashing && dashCooldownTimer <= 0f;
 
     public Vector2 CurrentInputDirection
     {
@@ -137,25 +148,69 @@ public class IronStormMovement : MonoBehaviour
         }
     }
 
-    private bool WasJumpTriggered()
+    public bool WasJumpTriggered()
     {
         if (jumpAction != null && jumpAction.action != null)
             return jumpAction.action.triggered;
         return Input.GetKeyDown(KeyCode.Space);
     }
 
-    private bool WasCrouchTriggered()
+    public bool WasCrouchTriggered()
     {
         if (crouchAction != null && crouchAction.action != null)
             return crouchAction.action.triggered;
         return Input.GetKeyDown(KeyCode.LeftControl);
     }
 
-    private bool WasDashTriggered()
+    public bool WasDashTriggered()
     {
         if (dashAction != null && dashAction.action != null)
             return dashAction.action.triggered;
         return Input.GetKeyDown(KeyCode.LeftAlt) || Input.GetKeyDown(KeyCode.V);
+    }
+
+    public bool TryStepJumpPackDash(float deltaTime, Vector3 preferredDirection)
+    {
+        if (!allowJumpPackDash) return false;
+
+        if (dashCooldownTimer > 0f)
+        {
+            dashCooldownTimer = Mathf.Max(0f, dashCooldownTimer - deltaTime);
+        }
+
+        if (!isDashing && WasDashTriggered() && dashCooldownTimer <= 0f)
+        {
+            Vector3 dir = preferredDirection;
+            dir.y = 0f;
+            if (dir.sqrMagnitude < 0.01f)
+            {
+                dir = transform.forward;
+                dir.y = 0f;
+            }
+
+            isDashing = true;
+            dashCooldownTimer = dashCooldown;
+            dashTimer = dashDistance / Mathf.Max(0.1f, dashSpeed);
+            dashDirection = dir.normalized;
+        }
+
+        if (!isDashing) return false;
+
+        if (controller == null)
+            controller = GetComponent<CharacterController>();
+
+        if (controller != null && controller.enabled)
+        {
+            controller.Move(dashDirection * dashSpeed * deltaTime);
+        }
+
+        dashTimer -= deltaTime;
+        if (dashTimer <= 0f)
+        {
+            isDashing = false;
+        }
+
+        return true;
     }
 
     private void Update()
@@ -176,23 +231,32 @@ public class IronStormMovement : MonoBehaviour
             velocity.y = -2f;
         }
 
-        // Hướng di chuyển lấy theo transform của playerBody (xoay ngang sạch, không bị scale méo)
         Vector2 inputDir = CurrentInputDirection;
         Vector3 move = transform.right * inputDir.x + transform.forward * inputDir.y;
         move = Vector3.ClampMagnitude(move, 1f);
 
-        if (WasDashTriggered() && !isDashing && dashCooldownTimer <= 0f)
+        bool canDashState = isGrounded || allowAirDash;
+        if (canDashState && WasDashTriggered() && !isDashing && dashCooldownTimer <= 0f)
         {
             isDashing = true;
             dashCooldownTimer = dashCooldown;
-            dashTimer = dashDistance / dashSpeed;
+            dashTimer = dashDistance / Mathf.Max(0.1f, dashSpeed);
             dashDirection = move.sqrMagnitude > 0.01f ? move.normalized : transform.forward;
+            if (!isGrounded)
+            {
+                velocity.y *= airDashVerticalCarry;
+            }
         }
 
         if (isDashing)
         {
             controller.Move(dashDirection * dashSpeed * Time.deltaTime);
             dashTimer -= Time.deltaTime;
+            if (!isGrounded)
+            {
+                velocity.y += gravity * airDashVerticalCarry * Time.deltaTime;
+                controller.Move(new Vector3(0f, velocity.y * Time.deltaTime, 0f));
+            }
             if (dashTimer <= 0f)
             {
                 isDashing = false;

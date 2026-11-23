@@ -260,7 +260,6 @@ public class SpaceMarineJumpPack : MonoBehaviour
             hasUsedJumpPackInAir = false;
         }
 
-        // Nếu đang thực sự đu hoặc kéo dây móc thì nhường quyền điều khiển cho GrappleHook
         bool đangDuHoacKeoDay = grappleHookScript != null && grappleHookScript.IsSwingingOrPulling;
         if (đangDuHoacKeoDay)
         {
@@ -441,6 +440,22 @@ public class SpaceMarineJumpPack : MonoBehaviour
 
         Vector3 moveDir = right * moveInput.x + forward * moveInput.y;
         moveDir = Vector3.ClampMagnitude(moveDir, 1f);
+
+        if (movementScript != null && movementScript.TryStepJumpPackDash(Time.deltaTime, moveDir))
+        {
+            currentHorizontalVelocity = moveDir.sqrMagnitude > 0.01f ? moveDir.normalized * airMoveSpeed : Vector3.zero;
+            if (isHovering)
+            {
+                hoverTimer += Time.deltaTime * hoverFrequency;
+                currentVerticalVelocity = Mathf.Sin(hoverTimer) * hoverAmplitude;
+            }
+            else
+            {
+                currentVerticalVelocity += airGravity * 0.25f * Time.deltaTime;
+                controller.Move(new Vector3(0f, currentVerticalVelocity * Time.deltaTime, 0f));
+            }
+            return;
+        }
 
         float targetSpeed = isBoosting ? boostMoveSpeed : airMoveSpeed;
         currentHorizontalSpeed = Mathf.Lerp(currentHorizontalSpeed, targetSpeed, moveSmoothness * Time.deltaTime);

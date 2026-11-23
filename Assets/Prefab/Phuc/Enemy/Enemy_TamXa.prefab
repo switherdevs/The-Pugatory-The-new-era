@@ -977,6 +977,8 @@ MonoBehaviour:
   doDaiKiemTraTuong: 2
   banKinhTamNhin: 50
   gocNhin: 120
+  heSoTangBanKinhTruyDuoi: 1.5
+  heSoTangGocTruyDuoi: 1.4
   diemDatMat: {fileID: 255309652028663356}
   thoiGianNhoDau: 3
   khoangCachVongTuong: 4.5
@@ -1005,7 +1007,7 @@ MonoBehaviour:
   soVienLienThanh: 4
   khoangCachGiuaCacVien: 0.14
   thoiGianNghiGiuaLoat: 1.6
-  prefabDanTamXa: {fileID: 1788540390887508892, guid: c2d574f4417a1f2408b0e1175842d027, type: 3}
+  prefabDanTamXa: {fileID: 1788540390887508892, guid: 813b087e44860dd40842bc726684752e, type: 3}
   diemBanDan:
   - {fileID: 1636860712242782183}
   - {fileID: 1083784036295114054}
@@ -1132,19 +1134,31 @@ MonoBehaviour:
   loaiDoiTuong: 1
   mauToiDa: 100
   giapPhongThu: 0
+  dungGiapNangLuong: 1
+  giapToiDa: 100
+  giapKhoiDau: -1
+  tiLeMauMatToiDaKhiCoGiap: 0.1
+  nguongDamageDatTranGiap: 50
+  heSoTieuHaoGiap: 1
   thoiGianBatTuSauTrungDon: 0
   tuDongHoiMau: 0
   thoiGianChoHoiMau: 5
   tocDoHoiMau: 10
   thanhMauSlider: {fileID: 5938614936497318573}
+  thanhGiapSlider: {fileID: 0}
   anThanhMauKhiDay: 1
   nguonAmThanh: {fileID: 0}
   amThanhTrungDon: {fileID: 0}
+  amThanhGiapChan: {fileID: 0}
+  amThanhHoiGiap: {fileID: 0}
   amThanhChet: {fileID: 0}
   amLuong: 0.9
   hieuUngKhiChet: {fileID: 0}
   thoiGianHuyKhiChet: 0.15
   onMauThayDoi:
+    m_PersistentCalls:
+      m_Calls: []
+  onGiapThayDoi:
     m_PersistentCalls:
       m_Calls: []
   onTrungDon:

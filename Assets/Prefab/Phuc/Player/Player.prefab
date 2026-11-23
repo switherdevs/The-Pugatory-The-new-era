@@ -56,11 +56,11 @@ Transform:
   m_GameObject: {fileID: 2300890862258506982}
   serializedVersion: 2
   m_LocalRotation: {x: -0, y: -0, z: -0, w: 1}
-  m_LocalPosition: {x: 0.451, y: 0.2070001, z: 1.136}
+  m_LocalPosition: {x: 0.451, y: -0.23499998, z: 1.136}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 1
   m_Children: []
-  m_Father: {fileID: 1475286881056047159}
+  m_Father: {fileID: 6120820107297739640}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1 &4317670434159137578
 GameObject:
@@ -89,11 +89,12 @@ Transform:
   m_GameObject: {fileID: 4317670434159137578}
   serializedVersion: 2
   m_LocalRotation: {x: -0, y: -0, z: -0, w: 1}
-  m_LocalPosition: {x: 0, y: 0.0990001, z: 0}
+  m_LocalPosition: {x: 0, y: 0.4420001, z: 0}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
-  m_Children: []
-  m_Father: {fileID: 506102371964454739}
+  m_Children:
+  - {fileID: 8696790530946382398}
+  m_Father: {fileID: 1475286881056047159}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!20 &2671973552140536834
 Camera:
@@ -260,7 +261,8 @@ Transform:
   m_LocalScale: {x: 1, y: 1.5, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children:
-  - {fileID: 8696790530946382398}
+  - {fileID: 9099146935271944496}
+  - {fileID: 6120820107297739640}
   - {fileID: 6365804242457185568}
   - {fileID: 5293205312425674427}
   - {fileID: 4154747853766558811}
@@ -586,8 +588,8 @@ MonoBehaviour:
   cameraScript: {fileID: 4768004406305984400}
   moveReferenceTransform: {fileID: 9099146935271944496}
   launchUpSpeed: 14
-  midAirBoostUpSpeed: 11
-  airGravity: -20
+  midAirBoostUpSpeed: 20
+  airGravity: -15
   hoverAmplitude: 0.35
   hoverFrequency: 2.5
   hoverSmoothness: 6
@@ -782,8 +784,8 @@ GameObject:
   - component: {fileID: 9099146935271944496}
   - component: {fileID: 421954269241359649}
   - component: {fileID: 5932918838033638196}
-  - component: {fileID: 4768004406305984400}
   - component: {fileID: 6813924575249703401}
+  - component: {fileID: 4768004406305984400}
   m_Layer: 0
   m_Name: Main Camera
   m_TagString: MainCamera
@@ -800,11 +802,11 @@ Transform:
   m_GameObject: {fileID: 6331562550841448542}
   serializedVersion: 2
   m_LocalRotation: {x: -0, y: -0, z: -0, w: 1}
-  m_LocalPosition: {x: 0, y: 0.0990001, z: 0}
+  m_LocalPosition: {x: 0, y: 0.4420001, z: 0}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
-  m_Father: {fileID: 506102371964454739}
+  m_Father: {fileID: 1475286881056047159}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!20 &421954269241359649
 Camera:
@@ -865,50 +867,6 @@ AudioListener:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 6331562550841448542}
   m_Enabled: 1
---- !u!114 &4768004406305984400
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 6331562550841448542}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 4ff01859cb3e91540ba37f04ca4fd214, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: Assembly-CSharp::IronStormCamera
-  mouseSensitivity: 2
-  topClamp: 90
-  bottomClamp: -90
-  enforceUniformCameraScale: 1
-  safeNearClipPlane: 0.1
-  applySafeNearClipPlane: 0
-  recoilSnappiness: 15
-  recoilReturnSpeed: 10
-  maxRecoilPitch: 10
-  walkRecoilMultiplier: 3
-  runRecoilMultiplier: 5
-  targetCamera: {fileID: 0}
-  weaponCamera: {fileID: 0}
-  affectMainCameraFovOnFlight: 0
-  flightFovIncrease: 15
-  fovTransitionSpeed: 10
-  enableFlightShake: 1
-  hoverShakeIntensity: 0.06
-  boostShakeIntensity: 0.14
-  flightShakeFrequency: 24
-  flightShakeSmoothness: 10
-  enableSnakeCam: 1
-  transitionSmoothness: 1
-  idleFrequency: 1.5
-  idleAmount: 0.25
-  walkFrequency: 5
-  walkAmount: 0.5
-  runFrequency: 10
-  runAmount: 1.25
-  jumpSnakeAmount: 0.08
-  lookAction: {fileID: -5630151704836100654, guid: 052faaac586de48259a63d0c4782560b, type: 3}
-  playerBody: {fileID: 1475286881056047159}
 --- !u!114 &6813924575249703401
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -954,6 +912,50 @@ MonoBehaviour:
     m_VarianceClampScale: 0.9
     m_ContrastAdaptiveSharpening: 0
   m_Version: 2
+--- !u!114 &4768004406305984400
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 6331562550841448542}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 4ff01859cb3e91540ba37f04ca4fd214, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::IronStormCamera
+  mouseSensitivity: 2
+  topClamp: 90
+  bottomClamp: -90
+  enforceUniformCameraScale: 1
+  safeNearClipPlane: 0.1
+  applySafeNearClipPlane: 0
+  recoilSnappiness: 15
+  recoilReturnSpeed: 10
+  maxRecoilPitch: 10
+  walkRecoilMultiplier: 3
+  runRecoilMultiplier: 5
+  targetCamera: {fileID: 421954269241359649}
+  weaponCamera: {fileID: 2671973552140536834}
+  affectMainCameraFovOnFlight: 0
+  flightFovIncrease: 15
+  fovTransitionSpeed: 10
+  enableFlightShake: 1
+  hoverShakeIntensity: 0.06
+  boostShakeIntensity: 0.14
+  flightShakeFrequency: 24
+  flightShakeSmoothness: 10
+  enableSnakeCam: 1
+  transitionSmoothness: 1
+  idleFrequency: 1.5
+  idleAmount: 0.25
+  walkFrequency: 5
+  walkAmount: 0.5
+  runFrequency: 10
+  runAmount: 1.25
+  jumpSnakeAmount: 0.08
+  lookAction: {fileID: -5630151704836100654, guid: 052faaac586de48259a63d0c4782560b, type: 3}
+  playerBody: {fileID: 1475286881056047159}
 --- !u!1 &6502799638042767523
 GameObject:
   m_ObjectHideFlags: 0
@@ -982,9 +984,7 @@ Transform:
   m_LocalPosition: {x: 0, y: 0.343, z: 0}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 1
-  m_Children:
-  - {fileID: 9099146935271944496}
-  - {fileID: 6120820107297739640}
+  m_Children: []
   m_Father: {fileID: 1475286881056047159}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1001 &2138286080114227010

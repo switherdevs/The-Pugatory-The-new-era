@@ -52,17 +52,35 @@ public class RangedEnemyAI : MonoBehaviour
     [Tooltip("Độ dài tia Raycast kiểm tra tường phía trước theo hướng di chuyển (tăng/giảm tùy ý).")]
     [SerializeField] private float doDaiKiemTraTuong = 2.2f;
 
-    [Tooltip("Bán kính tầm nhìn của quái.")]
+    [Tooltip("Bán kính tầm nhìn mặc định của quái.")]
     [SerializeField] private float banKinhTamNhin = 24f;
 
-    [Tooltip("Góc nhìn (độ) tính từ hướng nhìn phía trước của quái.")]
+    [Tooltip("Góc nhìn ngang mặc định (độ) tính từ hướng nhìn phía trước của quái.")]
     [Range(10f, 360f)]
     [SerializeField] private float gocNhin = 120f;
+
+    [Tooltip("Góc nhìn hướng lên trên (độ) tính từ mặt phẳng ngang của mắt quái.")]
+    [Range(0f, 90f)]
+    [SerializeField] private float gocNhinTren = 35f;
+
+    [Tooltip("Góc nhìn hướng xuống dưới (độ) tính từ mặt phẳng ngang của mắt quái.")]
+    [Range(0f, 90f)]
+    [SerializeField] private float gocNhinDuoi = 35f;
+
+    [Header("Tăng Vùng Nhìn Khi Truy Đuổi")]
+    [Tooltip("Hệ số nhân bán kính tầm nhìn khi đang trong trạng thái Truy Đuổi (ví dụ 1.5 = tăng 50%).")]
+    [SerializeField] private float heSoTangBanKinhTruyDuoi = 1.5f;
+
+    [Tooltip("Hệ số nhân góc nhìn ngang khi đang trong trạng thái Truy Đuổi (ví dụ 1.4 = mở rộng góc nhìn).")]
+    [SerializeField] private float heSoTangGocTruyDuoi = 1.4f;
+
+    [Tooltip("Hệ số nhân góc nhìn trên/dưới khi đang trong trạng thái Truy Đuổi (ví dụ 1.35 = tăng 35%).")]
+    [SerializeField] private float heSoTangGocDocTruyDuoi = 1.35f;
 
     [Tooltip("Điểm xuất phát tia kiểm tra tầm nhìn (nếu để trống tự tính từ mắt/thân quái).")]
     [SerializeField] private Transform diemDatMat;
 
-    [Tooltip("Thời gian quái tiếp tục nhớ/truy đuổi và vòng/luồn qua tường sau khi bị tường che.")]
+    [Tooltip("Thời gian quái tiếp tục nhớ/truy đuổi sau khi bị tường che trước khi mất dấu.")]
     [SerializeField] private float thoiGianNhoDau = 4.5f;
 
     [Tooltip("Khoảng cách tìm điểm vòng sang hai bên để luồn qua tường khi bị chắn.")]
@@ -169,7 +187,6 @@ public class RangedEnemyAI : MonoBehaviour
     private Vector3 viTriNguoiChoiCuoiCung;
     private Vector3 diemLuonTuongHienTai;
     private Vector3 diemTimKiemHienTai;
-    private bool dangLuonTuong = false;
     private bool daCoDiemTimKiem = false;
     private bool biVucThamChanKhongDiSangDuoc = false;
     private float boDemThoiGianNhoDau = 0f;
@@ -186,6 +203,53 @@ public class RangedEnemyAI : MonoBehaviour
     private float boDemThoiGianNghi = 0f;
     private float thoiDiemLoatTiepTheo = 0f;
     private bool dangBanLienThanh = false;
+
+    private float LayBanKinhTamNhinHienTai()
+    {
+        bool dangTruyDuoi = trangThaiHienTai == TrangThaiAI.TruyDuoi || boDemThoiGianNhoDau > 0f;
+        float heSo = dangTruyDuoi ? Mathf.Max(1f, heSoTangBanKinhTruyDuoi) : 1f;
+        return banKinhTamNhin * heSo;
+    }
+
+    private float LayGocNhinHienTai()
+    {
+        bool dangTruyDuoi = trangThaiHienTai == TrangThaiAI.TruyDuoi || boDemThoiGianNhoDau > 0f;
+        float heSo = dangTruyDuoi ? Mathf.Max(1f, heSoTangGocTruyDuoi) : 1f;
+        return Mathf.Clamp(gocNhin * heSo, 10f, 360f);
+    }
+
+    private void LayGocNhinDocHienTai(out float gocTrenHienTai, out float gocDuoiHienTai)
+    {
+        bool dangTruyDuoi = trangThaiHienTai == TrangThaiAI.TruyDuoi || boDemThoiGianNhoDau > 0f;
+        float heSo = dangTruyDuoi ? Mathf.Max(1f, heSoTangGocDocTruyDuoi) : 1f;
+        gocTrenHienTai = Mathf.Clamp(gocNhinTren * heSo, 0f, 90f);
+        gocDuoiHienTai = Mathf.Clamp(gocNhinDuoi * heSo, 0f, 90f);
+    }
+
+    private bool NamTrongVungNhinDoc(Vector3 diemDau, Vector3 diemDich)
+    {
+        Vector3 delta = diemDich - diemDau;
+        Vector3 huongNgang = new Vector3(delta.x, 0f, delta.z);
+        float doDaiNgang = huongNgang.magnitude;
+
+        if (doDaiNgang < 0.0001f)
+        {
+            if (Mathf.Abs(delta.y) < 0.0001f) return true;
+            return delta.y > 0f ? gocNhinTren >= 89.9f : gocNhinDuoi >= 89.9f;
+        }
+
+        LayGocNhinDocHienTai(out float gocTrenHienTai, out float gocDuoiHienTai);
+        float gocDoLech = Mathf.Atan2(delta.y, doDaiNgang) * Mathf.Rad2Deg;
+
+        if (gocDoLech >= 0f)
+        {
+            return gocDoLech <= gocTrenHienTai;
+        }
+        else
+        {
+            return (-gocDoLech) <= gocDuoiHienTai;
+        }
+    }
 
     private void Awake()
     {
@@ -232,7 +296,6 @@ public class RangedEnemyAI : MonoBehaviour
                 daPhatAmThanhPhatHien = true;
             }
             viTriNguoiChoiCuoiCung = mucTieuNguoiChoiHienTai.position;
-            dangLuonTuong = false;
             daCoDiemTimKiem = false;
             boDemThoiGianNhoDau = thoiGianNhoDau;
             boDemThoiGianTimKiem = thoiGianTimKiemKhiMatDau;
@@ -253,13 +316,11 @@ public class RangedEnemyAI : MonoBehaviour
                 if (boDemThoiGianNhoDau <= 0f)
                 {
                     mucTieuNguoiChoiHienTai = null;
-                    dangLuonTuong = false;
                     daPhatAmThanhPhatHien = false;
                 }
             }
             else
             {
-                dangLuonTuong = false;
                 daPhatAmThanhPhatHien = false;
             }
         }
@@ -276,7 +337,8 @@ public class RangedEnemyAI : MonoBehaviour
         boDemTuanTraMatDau = thoiGianTuanTraKhiMatDau;
         daCoDiemTimKiem = false;
 
-        Collider[] nguoiChoiGan = Physics.OverlapSphere(transform.position, banKinhTamNhin * 1.5f, layerNguoiChoi, QueryTriggerInteraction.Ignore);
+        float banKinhQuet = LayBanKinhTamNhinHienTai() * 1.5f;
+        Collider[] nguoiChoiGan = Physics.OverlapSphere(transform.position, banKinhQuet, layerNguoiChoi, QueryTriggerInteraction.Ignore);
         if (nguoiChoiGan != null && nguoiChoiGan.Length > 0)
         {
             mucTieuNguoiChoiHienTai = nguoiChoiGan[0].transform;
@@ -326,9 +388,6 @@ public class RangedEnemyAI : MonoBehaviour
         return false;
     }
 
-    /// <summary>
-    /// Raycast kiểm tra tường theo hướng di chuyển với độ dài tùy chỉnh (doDaiKiemTraTuong) và tagVatCan
-    /// </summary>
     private bool CoTuongPhiaTruoc(Vector3 huongDiChuyen)
     {
         if (string.IsNullOrEmpty(tagVatCan) || tagVatCan == "Untagged")
@@ -463,7 +522,10 @@ public class RangedEnemyAI : MonoBehaviour
 
     private bool QuetThayNguoiChoi()
     {
-        Collider[] cacVaCham = Physics.OverlapSphere(transform.position, banKinhTamNhin, layerNguoiChoi, QueryTriggerInteraction.Ignore);
+        float banKinhQuet = LayBanKinhTamNhinHienTai();
+        float gocQuet = LayGocNhinHienTai();
+
+        Collider[] cacVaCham = Physics.OverlapSphere(transform.position, banKinhQuet, layerNguoiChoi, QueryTriggerInteraction.Ignore);
         if (cacVaCham == null || cacVaCham.Length == 0)
         {
             biVucThamChanKhongDiSangDuoc = false;
@@ -481,11 +543,17 @@ public class RangedEnemyAI : MonoBehaviour
             Vector3 tamMucTieu = vaCham.bounds.center;
             Vector3 huongToiMucTieu = tamMucTieu - viTriMat;
             float khoangCach = huongToiMucTieu.magnitude;
-            if (khoangCach > banKinhTamNhin || khoangCach < 0.001f) continue;
+            if (khoangCach > banKinhQuet || khoangCach < 0.001f) continue;
 
-            Vector3 donViHuong = huongToiMucTieu / khoangCach;
-            float doLechGoc = Vector3.Angle(transform.forward, donViHuong);
-            if (doLechGoc > gocNhin * 0.5f) continue;
+            Vector3 huongNgangMucTieu = new Vector3(huongToiMucTieu.x, 0f, huongToiMucTieu.z);
+            Vector3 huongNgangNhin = new Vector3(transform.forward.x, 0f, transform.forward.z);
+            if (huongNgangMucTieu.sqrMagnitude > 0.0001f && huongNgangNhin.sqrMagnitude > 0.0001f)
+            {
+                float doLechGocNgang = Vector3.Angle(huongNgangNhin.normalized, huongNgangMucTieu.normalized);
+                if (doLechGocNgang > gocQuet * 0.5f) continue;
+            }
+
+            if (!NamTrongVungNhinDoc(viTriMat, tamMucTieu)) continue;
 
             if (BiVatCanChan(viTriMat, tamMucTieu))
             {
@@ -510,50 +578,17 @@ public class RangedEnemyAI : MonoBehaviour
         return false;
     }
 
-    private Vector3 TinhDiemTruyDuoiVaLuonTuong(bool coTheThayNgayBayGio)
+    // Khi đang truy đuổi: không di chuyển ngẫu nhiên/vòng ngẫu nhiên, chỉ dí thẳng theo người chơi cho tới khi mất dấu
+    private Vector3 TinhDiemTruyDuoiTrucTiep(bool coTheThayNgayBayGio)
     {
         if (coTheThayNgayBayGio && mucTieuNguoiChoiHienTai != null)
         {
-            dangLuonTuong = false;
             return mucTieuNguoiChoiHienTai.position;
         }
 
-        Vector3 huongToiPlayer = viTriNguoiChoiCuoiCung - transform.position;
-        huongToiPlayer.y = 0f;
-        if (huongToiPlayer.sqrMagnitude < 0.01f)
+        if (mucTieuNguoiChoiHienTai != null)
         {
-            return viTriNguoiChoiCuoiCung;
-        }
-
-        Vector3 donViHuong = huongToiPlayer.normalized;
-        Vector3 benPhai = new Vector3(donViHuong.z, 0f, -donViHuong.x);
-
-        if (!dangLuonTuong || Vector3.Distance(transform.position, diemLuonTuongHienTai) <= 1.2f)
-        {
-            Vector3 diemPhai = transform.position + donViHuong * (khoangCachVongTuong * 0.6f) + benPhai * khoangCachVongTuong;
-            Vector3 diemTrai = transform.position + donViHuong * (khoangCachVongTuong * 0.6f) - benPhai * khoangCachVongTuong;
-
-            bool phaiBiChan = BiVatCanChan(transform.position + Vector3.up * 0.8f, diemPhai + Vector3.up * 0.8f);
-            bool traiBiChan = BiVatCanChan(transform.position + Vector3.up * 0.8f, diemTrai + Vector3.up * 0.8f);
-
-            if (!phaiBiChan && traiBiChan)
-            {
-                diemLuonTuongHienTai = diemPhai;
-            }
-            else if (!traiBiChan && phaiBiChan)
-            {
-                diemLuonTuongHienTai = diemTrai;
-            }
-            else
-            {
-                diemLuonTuongHienTai = Random.value < 0.5f ? diemPhai : diemTrai;
-            }
-            dangLuonTuong = true;
-        }
-
-        if (!BiVatCanChan(transform.position + Vector3.up * 0.8f, diemLuonTuongHienTai + Vector3.up * 0.8f))
-        {
-            return diemLuonTuongHienTai;
+            return mucTieuNguoiChoiHienTai.position;
         }
 
         return viTriNguoiChoiCuoiCung;
@@ -697,17 +732,9 @@ public class RangedEnemyAI : MonoBehaviour
 
             case TrangThaiAI.TruyDuoi:
                 DatTocDoDiChuyen(tocDoTruyDuoi);
-                Vector3 viTriTruyDuoi = TinhDiemTruyDuoiVaLuonTuong(coTheThayNgayBayGio);
+                Vector3 viTriTruyDuoi = TinhDiemTruyDuoiTrucTiep(coTheThayNgayBayGio);
                 DiChuyenToiViTri(viTriTruyDuoi);
-
-                if (coTheThayNgayBayGio && mucTieuNguoiChoiHienTai != null)
-                {
-                    XoayMatVeMucTieu(mucTieuNguoiChoiHienTai.position);
-                }
-                else
-                {
-                    XoayMatVeMucTieu(viTriTruyDuoi);
-                }
+                XoayMatVeMucTieu(viTriTruyDuoi);
                 break;
 
             case TrangThaiAI.TimKiem:
@@ -1013,11 +1040,6 @@ public class RangedEnemyAI : MonoBehaviour
                 diemTimKiemHienTai = diemAnToan;
                 daCoDiemTimKiem = true;
             }
-            else if (trangThaiHienTai == TrangThaiAI.TruyDuoi)
-            {
-                diemLuonTuongHienTai = diemAnToan;
-                dangLuonTuong = true;
-            }
 
             XoayMatVeMucTieu(diemAnToan);
             viTriDich = diemAnToan;
@@ -1025,45 +1047,44 @@ public class RangedEnemyAI : MonoBehaviour
         }
         else if (huongNgang.sqrMagnitude > 0.01f && CoTuongPhiaTruoc(huongNgang))
         {
-            Vector3 huongChuan = huongNgang.normalized;
-            Vector3 huongTrai = Quaternion.Euler(0f, -75f, 0f) * huongChuan;
-            Vector3 huongPhai = Quaternion.Euler(0f, 75f, 0f) * huongChuan;
-            float khoangCachVong = Mathf.Max(doDaiKiemTraTuong + 1.5f, khoangCachVongTuong * 0.7f);
+            // Khi đang truy đuổi: không đổi hướng random/vòng ngẫu nhiên, giữ nguyên hướng tới mục tiêu
+            if (trangThaiHienTai != TrangThaiAI.TruyDuoi)
+            {
+                Vector3 huongChuan = huongNgang.normalized;
+                Vector3 huongTrai = Quaternion.Euler(0f, -75f, 0f) * huongChuan;
+                Vector3 huongPhai = Quaternion.Euler(0f, 75f, 0f) * huongChuan;
+                float khoangCachVong = Mathf.Max(doDaiKiemTraTuong + 1.5f, khoangCachVongTuong * 0.7f);
 
-            Vector3 diemVong = huongPhai;
-            if (!CoTuongPhiaTruoc(huongPhai) && !LaVucThamPhiaTruoc(huongPhai))
-            {
-                diemVong = transform.position + huongPhai * khoangCachVong;
-            }
-            else if (!CoTuongPhiaTruoc(huongTrai) && !LaVucThamPhiaTruoc(huongTrai))
-            {
-                diemVong = transform.position + huongTrai * khoangCachVong;
-            }
-            else
-            {
-                Vector3 huongThayThe = TimHuongAnToanTranhVucTham(huongChuan);
-                diemVong = transform.position + huongThayThe * khoangCachVong;
-            }
+                Vector3 diemVong = huongPhai;
+                if (!CoTuongPhiaTruoc(huongPhai) && !LaVucThamPhiaTruoc(huongPhai))
+                {
+                    diemVong = transform.position + huongPhai * khoangCachVong;
+                }
+                else if (!CoTuongPhiaTruoc(huongTrai) && !LaVucThamPhiaTruoc(huongTrai))
+                {
+                    diemVong = transform.position + huongTrai * khoangCachVong;
+                }
+                else
+                {
+                    Vector3 huongThayThe = TimHuongAnToanTranhVucTham(huongChuan);
+                    diemVong = transform.position + huongThayThe * khoangCachVong;
+                }
 
-            if (trangThaiHienTai == TrangThaiAI.TuanTra)
-            {
-                diemDenTuanTraHienTai = diemVong;
-                daCoDiemDenTuanTra = true;
-            }
-            else if (trangThaiHienTai == TrangThaiAI.TimKiem)
-            {
-                diemTimKiemHienTai = diemVong;
-                daCoDiemTimKiem = true;
-            }
-            else if (trangThaiHienTai == TrangThaiAI.TruyDuoi)
-            {
-                diemLuonTuongHienTai = diemVong;
-                dangLuonTuong = true;
-            }
+                if (trangThaiHienTai == TrangThaiAI.TuanTra)
+                {
+                    diemDenTuanTraHienTai = diemVong;
+                    daCoDiemDenTuanTra = true;
+                }
+                else if (trangThaiHienTai == TrangThaiAI.TimKiem)
+                {
+                    diemTimKiemHienTai = diemVong;
+                    daCoDiemTimKiem = true;
+                }
 
-            viTriDich = diemVong;
-            huongNgang = viTriDich - transform.position;
-            huongNgang.y = 0f;
+                viTriDich = diemVong;
+                huongNgang = viTriDich - transform.position;
+                huongNgang.y = 0f;
+            }
         }
 
         if (dieuHuongNavMesh != null && dieuHuongNavMesh.enabled && dieuHuongNavMesh.isOnNavMesh)
@@ -1117,18 +1138,30 @@ public class RangedEnemyAI : MonoBehaviour
         if (!hienThiVungNhinGizmos) return;
 
         Vector3 viTriMat = LayViTriMat();
+        float banKinhVe = Application.isPlaying ? LayBanKinhTamNhinHienTai() : banKinhTamNhin;
+        float gocVe = Application.isPlaying ? LayGocNhinHienTai() : gocNhin;
+
+        LayGocNhinDocHienTai(out float gocTrenVe, out float gocDuoiVe);
+        Vector3 huongNgangVe = new Vector3(transform.forward.x, 0f, transform.forward.z);
+        if (huongNgangVe.sqrMagnitude < 0.0001f) huongNgangVe = Vector3.forward;
+        huongNgangVe.Normalize();
+
+        Vector3 tiaTren = Quaternion.AngleAxis(-gocTrenVe, transform.right) * huongNgangVe;
+        Vector3 tiaDuoi = Quaternion.AngleAxis(gocDuoiVe, transform.right) * huongNgangVe;
+        Gizmos.color = new Color(1f, 0.65f, 0.1f, 0.9f);
+        Gizmos.DrawRay(viTriMat, tiaTren.normalized * banKinhVe);
+        Gizmos.DrawRay(viTriMat, tiaDuoi.normalized * banKinhVe);
 
         Gizmos.color = new Color(0.2f, 0.85f, 1f, 0.45f);
-        Gizmos.DrawWireSphere(viTriMat, banKinhTamNhin);
+        Gizmos.DrawWireSphere(viTriMat, banKinhVe);
 
-        Vector3 bienTrai = Quaternion.Euler(0f, -gocNhin * 0.5f, 0f) * transform.forward;
-        Vector3 bienPhai = Quaternion.Euler(0f, gocNhin * 0.5f, 0f) * transform.forward;
+        Vector3 bienTrai = Quaternion.Euler(0f, -gocVe * 0.5f, 0f) * transform.forward;
+        Vector3 bienPhai = Quaternion.Euler(0f, gocVe * 0.5f, 0f) * transform.forward;
 
         Gizmos.color = Color.cyan;
-        Gizmos.DrawRay(viTriMat, bienTrai.normalized * banKinhTamNhin);
-        Gizmos.DrawRay(viTriMat, bienPhai.normalized * banKinhTamNhin);
+        Gizmos.DrawRay(viTriMat, bienTrai.normalized * banKinhVe);
+        Gizmos.DrawRay(viTriMat, bienPhai.normalized * banKinhVe);
 
-        // Hiển thị tia raycast kiểm tra tường phía trước theo doDaiKiemTraTuong
         Gizmos.color = new Color(1f, 0.45f, 0.1f, 0.95f);
         Gizmos.DrawRay(transform.position + Vector3.up * 0.85f, transform.forward * Mathf.Max(0.1f, doDaiKiemTraTuong));
 
