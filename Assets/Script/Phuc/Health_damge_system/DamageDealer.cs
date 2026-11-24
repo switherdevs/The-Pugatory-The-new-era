@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using UnityEngine;
 
 public class DamageDealer : MonoBehaviour
@@ -28,8 +29,20 @@ public class DamageDealer : MonoBehaviour
     [Tooltip("Hiệu ứng tia lửa/nổ khi đạn va chạm (tùy chọn).")]
     [SerializeField] private GameObject hieuUngVaCham;
 
+    [Header("Chế độ nhận va chạm (Collision & Trigger)")]
+    [Tooltip("Cho phép gây sát thương thông qua OnCollisionEnter / OnCollisionStay (va chạm vật lý cứng).")]
+    [SerializeField] private bool gaySatThuongQuaCollision = true;
+
+    [Tooltip("Cho phép gây sát thương thông qua OnTriggerEnter / OnTriggerStay (vùng trigger / đạn trigger).")]
+    [SerializeField] private bool gaySatThuongQuaTrigger = true;
+
+    [Tooltip("Cho phép gây sát thương duy trì khi giữ va chạm (OnCollisionStay / OnTriggerStay) nếu không hủy sau va chạm.")]
+    [SerializeField] private bool gaySatThuongKhiDangCham = true;
+
     private Transform chuSoHuu;
     private float thoiDiemGaySatThuongTiepTheo = 0f;
+    private readonly Dictionary<int, float> thoiDiemTrúngTheoMucTieu = new Dictionary<int, float>();
+    private bool daBiHuyHoacHoanTat = false;
 
     private void Start()
     {
@@ -57,30 +70,33 @@ public class DamageDealer : MonoBehaviour
 
     private void OnTriggerEnter(Collider other)
     {
-        XuLyVaCham(other.gameObject, other.ClosestPoint(transform.position));
+        if (!gaySatThuongQuaTrigger || other == null) return;
+        XuLyVaCham(other.gameObject, other.ClosestPoint(transform.position), laVaChamLienTuc: false);
     }
 
     private void OnTriggerStay(Collider other)
     {
-        // Dùng cho vùng sát thương liên tục (bẫy lửa, độc...) khi không hủy sau va chạm
-        if (!huySauKhiVaCham && Time.time >= thoiDiemGaySatThuongTiepTheo)
-        {
-            if (XuLyVaCham(other.gameObject, other.ClosestPoint(transform.position)))
-            {
-                thoiDiemGaySatThuongTiepTheo = Time.time + thoiGianHoiSatThuongLienTuc;
-            }
-        }
+        if (!gaySatThuongQuaTrigger || !gaySatThuongKhiDangCham || huySauKhiVaCham || other == null) return;
+        XuLyVaCham(other.gameObject, other.ClosestPoint(transform.position), laVaChamLienTuc: true);
     }
 
     private void OnCollisionEnter(Collision collision)
     {
+        if (!gaySatThuongQuaCollision || collision == null) return;
         Vector3 diemCham = collision.contactCount > 0 ? collision.GetContact(0).point : transform.position;
-        XuLyVaCham(collision.gameObject, diemCham);
+        XuLyVaCham(collision.gameObject, diemCham, laVaChamLienTuc: false);
     }
 
-    private bool XuLyVaCham(GameObject doiTuongVaCham, Vector3 diemVaCham)
+    private void OnCollisionStay(Collision collision)
     {
-        if (doiTuongVaCham == null) return false;
+        if (!gaySatThuongQuaCollision || !gaySatThuongKhiDangCham || huySauKhiVaCham || collision == null) return;
+        Vector3 diemCham = collision.contactCount > 0 ? collision.GetContact(0).point : transform.position;
+        XuLyVaCham(collision.gameObject, diemCham, laVaChamLienTuc: true);
+    }
+
+    private bool XuLyVaCham(GameObject doiTuongVaCham, Vector3 diemVaCham, bool laVaChamLienTuc)
+    {
+        if (daBiHuyHoacHoanTat || doiTuongVaCham == null) return false;
 
         // Bỏ qua chính người bắn
         if (chuSoHuu != null && doiTuongVaCham.transform.root == chuSoHuu.root)
@@ -98,8 +114,38 @@ public class DamageDealer : MonoBehaviour
                 return false;
             }
 
+            int targetId = heThongMau.GetInstanceID();
+            float thoiGianHoi = Mathf.Max(0.05f, thoiGianHoiSatThuongLienTuc);
+
+            if (laVaChamLienTuc)
+            {
+                if (Time.time < thoiDiemGaySatThuongTiepTheo)
+                {
+                    return false;
+                }
+
+                if (thoiDiemTrúngTheoMucTieu.TryGetValue(targetId, out float nextTargetHitTime) && Time.time < nextTargetHitTime)
+                {
+                    return false;
+                }
+            }
+            else
+            {
+                // Chống kích hoạt kép cả OnCollisionEnter và OnTriggerEnter cùng lúc trong 0.02s
+                if (thoiDiemTrúngTheoMucTieu.TryGetValue(targetId, out float lastHitTime) && Time.time - lastHitTime < 0.02f)
+                {
+                    return false;
+                }
+            }
+
             heThongMau.NhanSatThuong(satThuong);
             daGaySatThuong = true;
+            thoiDiemTrúngTheoMucTieu[targetId] = Time.time + thoiGianHoi;
+
+            if (laVaChamLienTuc)
+            {
+                thoiDiemGaySatThuongTiepTheo = Time.time + thoiGianHoi;
+            }
         }
 
         if (hieuUngVaCham != null)
@@ -109,6 +155,7 @@ public class DamageDealer : MonoBehaviour
 
         if (huySauKhiVaCham)
         {
+            daBiHuyHoacHoanTat = true;
             Destroy(gameObject);
         }
 

@@ -73,6 +73,8 @@ public class SniperWeapon : MonoBehaviour
     [Header("CS2 Sniper Scope / Zoom Settings")]
     [Tooltip("Kéo GameObject chứa ảnh tâm ngắm (Scope UI Canvas/Panel) vào đây.")]
     [SerializeField] private GameObject scopeUIObject;
+    [Tooltip("Kéo các GameObject chứa mesh súng (kể cả ở object khác) vào đây để ẩn khi đang ngắm scope.")]
+    [SerializeField] private GameObject[] weaponMeshesToHideOnScope;
     [Tooltip("Góc nhìn (FOV) mặc định của Camera khi không zoom.")]
     [SerializeField] private float normalFOV = 60f;
     [Tooltip("Góc nhìn (FOV) khi Zoom mức 1.")]
@@ -90,6 +92,9 @@ public class SniperWeapon : MonoBehaviour
     private int zoomStage = 0; // 0: Không zoom, 1: Zoom lần 1, 2: Zoom lần 2
     private float targetFOV;
     private Camera mainCam;
+    private PlayerAimAndLean aimAndLeanRef;
+    private bool aimAndLeanWasEnabledBeforeScope = true;
+    private bool hasOverriddenAimAndLean = false;
 
     [Header("Input Action References")]
     [SerializeField] private InputActionReference fireAction;
@@ -114,6 +119,61 @@ public class SniperWeapon : MonoBehaviour
         Debug.Log("Súng tỉa đã nhặt thêm " + amount + " viên đạn. Tổng dự phòng: " + reserveAmmo);
     }
 
+    private void Awake()
+    {
+        aimAndLeanRef = GetComponentInParent<PlayerAimAndLean>();
+        if (aimAndLeanRef == null)
+        {
+            aimAndLeanRef = FindFirstObjectByType<PlayerAimAndLean>();
+        }
+    }
+
+    private void SetWeaponMeshesVisible(bool visible)
+    {
+        if (weaponMeshesToHideOnScope == null) return;
+
+        for (int i = 0; i < weaponMeshesToHideOnScope.Length; i++)
+        {
+            GameObject meshObj = weaponMeshesToHideOnScope[i];
+            if (meshObj != null && meshObj.activeSelf != visible)
+            {
+                meshObj.SetActive(visible);
+            }
+        }
+    }
+
+    private void DongBoTrangThaiAimAndLean(bool dangNgamScope)
+    {
+        if (aimAndLeanRef == null)
+        {
+            aimAndLeanRef = GetComponentInParent<PlayerAimAndLean>();
+            if (aimAndLeanRef == null)
+            {
+                aimAndLeanRef = FindFirstObjectByType<PlayerAimAndLean>();
+            }
+        }
+
+        if (aimAndLeanRef == null) return;
+
+        if (dangNgamScope)
+        {
+            if (!hasOverriddenAimAndLean)
+            {
+                aimAndLeanWasEnabledBeforeScope = aimAndLeanRef.enabled;
+                hasOverriddenAimAndLean = true;
+            }
+            if (aimAndLeanRef.enabled)
+            {
+                aimAndLeanRef.enabled = false;
+            }
+        }
+        else if (hasOverriddenAimAndLean)
+        {
+            aimAndLeanRef.enabled = aimAndLeanWasEnabledBeforeScope;
+            hasOverriddenAimAndLean = false;
+        }
+    }
+
     private void Start()
     {
         currentAmmo = maxAmmo;
@@ -131,6 +191,7 @@ public class SniperWeapon : MonoBehaviour
         {
             scopeUIObject.SetActive(false);
         }
+        SetWeaponMeshesVisible(true);
 
         AudioSource[] sources = GetComponents<AudioSource>();
         if (sources.Length >= 2)
@@ -285,6 +346,8 @@ public class SniperWeapon : MonoBehaviour
             if (zoomStage == 1)
             {
                 targetFOV = zoomLevel1FOV;
+                DongBoTrangThaiAimAndLean(true);
+                SetWeaponMeshesVisible(false);
                 if (scopeUIObject != null)
                 {
                     scopeUIObject.SetActive(true);
@@ -294,6 +357,8 @@ public class SniperWeapon : MonoBehaviour
             else if (zoomStage == 2)
             {
                 targetFOV = zoomLevel2FOV;
+                DongBoTrangThaiAimAndLean(true);
+                SetWeaponMeshesVisible(false);
                 if (scopeUIObject != null)
                 {
                     scopeUIObject.SetActive(true);
@@ -311,6 +376,8 @@ public class SniperWeapon : MonoBehaviour
     {
         zoomStage = 0;
         targetFOV = normalFOV;
+        SetWeaponMeshesVisible(true);
+        DongBoTrangThaiAimAndLean(false);
         if (scopeUIObject != null)
         {
             scopeUIObject.SetActive(false);

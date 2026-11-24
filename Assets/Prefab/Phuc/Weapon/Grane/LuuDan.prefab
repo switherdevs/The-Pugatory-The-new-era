@@ -250,7 +250,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::GrenadeWeapon
   tenHienThiVuKhi: Frag Grenade
   soLuongLuuDanToiDa: 4
-  soLuongLuuDanKhoiDau: -1
+  soLuongLuuDanKhoiDau: 0
   thoiGianNghiGiuaCacLanNem: 1.25
   hanhDongNem: {fileID: -6877413652922633653, guid: 052faaac586de48259a63d0c4782560b, type: 3}
   hanhDongHuyNem: {fileID: 2982816287555978608, guid: 052faaac586de48259a63d0c4782560b, type: 3}

@@ -181,6 +181,8 @@ MonoBehaviour:
   reloadTiltZAngle: 10
   reloadTiltXAngle: 15
   scopeUIObject: {fileID: 0}
+  weaponMeshesToHideOnScope:
+  - {fileID: 4720305791133619763}
   normalFOV: 60
   zoomLevel1FOV: 40
   zoomLevel2FOV: 15
@@ -353,3 +355,8 @@ MonoBehaviour:
   applyToChildren: 1
   weaponLayerIndex: 8
   unheldLayerIndex: 0
+--- !u!1 &4720305791133619763 stripped
+GameObject:
+  m_CorrespondingSourceObject: {fileID: 8164078558771037576, guid: 8e70ad1527131964fb07b8c60dfa3c3d, type: 3}
+  m_PrefabInstance: {fileID: 3516545130738963387}
+  m_PrefabAsset: {fileID: 0}

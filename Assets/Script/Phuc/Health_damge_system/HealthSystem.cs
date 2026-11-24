@@ -176,16 +176,25 @@ public class HealthSystem : MonoBehaviour
             // Mức mất máu tối đa theo cấu hình (mặc định 10% máu tối đa)
             float tranMauMat = mauToiDa * Mathf.Clamp01(tiLeMauMatToiDaKhiCoGiap);
 
-            // Tỉ lệ theo damage (damage càng nhỏ thì mất ít hơn 10% máu, chạm ngưỡng thì đạt mức trần 10%)
+            // Làm mượt đường cong sát thương khi trúng giáp để đạn súng không bị bóp quá nhỏ
             float nguongAnToan = Mathf.Max(0.01f, nguongDamageDatTranGiap);
-            float heSoDamage = Mathf.Clamp01(satThuongGoc / nguongAnToan);
+            float tyLeDamage = Mathf.Clamp01(satThuongGoc / nguongAnToan);
+            float heSoDamage = loaiDoiTuong == LoaiDoiTuong.QuaiVat
+                ? Mathf.Sqrt(tyLeDamage)
+                : tyLeDamage;
 
-            // Sát thương vào máu luôn <= 10% máu tối đa và không vượt quá sát thương gốc
-            satThuongVaoMau = Mathf.Min(satThuongGoc, tranMauMat * heSoDamage);
+            float satThuongToiThieu = loaiDoiTuong == LoaiDoiTuong.QuaiVat
+                ? Mathf.Min(satThuongGoc * 0.5f, tranMauMat)
+                : 0f;
+
+            satThuongVaoMau = Mathf.Max(satThuongToiThieu, Mathf.Min(satThuongGoc, tranMauMat * heSoDamage));
             satThuongVaoMau = Mathf.Clamp(satThuongVaoMau, 0f, tranMauMat);
 
-            // Trừ năng lượng giáp
-            float luongGiapTieuHao = satThuongGoc * Mathf.Max(0f, heSoTieuHaoGiap);
+            // Trừ năng lượng giáp (quái tiêu hao giáp mượt hơn để cảm nhận tụt giáp rõ)
+            float heSoGiap = loaiDoiTuong == LoaiDoiTuong.QuaiVat
+                ? Mathf.Max(1f, heSoTieuHaoGiap)
+                : Mathf.Max(0f, heSoTieuHaoGiap);
+            float luongGiapTieuHao = satThuongGoc * heSoGiap;
             giapHienTai = Mathf.Max(0f, giapHienTai - luongGiapTieuHao);
             onGiapThayDoi?.Invoke(giapHienTai, giapToiDa);
         }

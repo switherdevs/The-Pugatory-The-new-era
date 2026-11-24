@@ -4957,7 +4957,7 @@ MonoBehaviour:
   pheGaySatThuong: 2
   satThuong: 50
   huySauKhiVaCham: 1
-  thoiGianTonTaiToiDa: 1
+  thoiGianTonTaiToiDa: 1.5
   thoiGianHoiSatThuongLienTuc: 0.5
   hieuUngVaCham: {fileID: 0}
 --- !u!1 &8288441326085927041
@@ -5004,8 +5004,8 @@ Light:
   serializedVersion: 12
   m_Type: 2
   m_Color: {r: 1, g: 0.54020506, b: 0, a: 1}
-  m_Intensity: 10
-  m_Range: 30
+  m_Intensity: 20
+  m_Range: 50
   m_SpotAngle: 30
   m_InnerSpotAngle: 21.80208
   m_CookieSize2D: {x: 0.5, y: 0.5}

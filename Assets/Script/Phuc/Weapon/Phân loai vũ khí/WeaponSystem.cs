@@ -34,6 +34,9 @@ public class WeaponSystem : MonoBehaviour
     [SerializeField] private float recoilUp = 1.5f;
     [Tooltip("Độ giật sang trái/phải ngẫu nhiên mỗi khi bắn.")]
     [SerializeField] private float recoilSide = 0.5f;
+    [Tooltip("Hệ số nhân độ giật khi đang Aim (0.5 = giảm 50% độ giật).")]
+    [Range(0f, 1f)]
+    [SerializeField] private float aimRecoilMultiplier = 0.5f;
 
     [Header("Crosshair Spread Settings")]
     [Tooltip("Lực bung tâm ngắm mỗi khi bắn một viên đạn.")]
@@ -61,6 +64,7 @@ public class WeaponSystem : MonoBehaviour
 
     private AudioSource audioSource;
     private IronStormCamera cameraRecoilRef;
+    private PlayerAimAndLean aimAndLeanRef;
 
     [Header("Reload Animation (Nghiêng súng theo trục Z)")]
     [SerializeField] private float reloadTiltZAngle = 30f;
@@ -83,6 +87,25 @@ public class WeaponSystem : MonoBehaviour
         if (!gameObject.activeInHierarchy || !enabled) return false;
         if (transform.parent == null) return false;
         return GetComponentInParent<CharacterController>() != null || GetComponentInParent<WeaponSwitcher>() != null;
+    }
+
+    private bool IsCurrentlyAiming()
+    {
+        if (aimAndLeanRef == null)
+        {
+            aimAndLeanRef = GetComponentInParent<PlayerAimAndLean>();
+            if (aimAndLeanRef == null)
+            {
+                aimAndLeanRef = FindFirstObjectByType<PlayerAimAndLean>();
+            }
+        }
+
+        if (aimAndLeanRef != null && aimAndLeanRef.enabled)
+        {
+            return aimAndLeanRef.IsAiming;
+        }
+
+        return Mouse.current != null && Mouse.current.rightButton.isPressed;
     }
 
     public void ToggleWeaponMode()
@@ -108,6 +131,12 @@ public class WeaponSystem : MonoBehaviour
         if (Camera.main != null)
         {
             cameraRecoilRef = Camera.main.GetComponent<IronStormCamera>();
+        }
+
+        aimAndLeanRef = GetComponentInParent<PlayerAimAndLean>();
+        if (aimAndLeanRef == null)
+        {
+            aimAndLeanRef = FindFirstObjectByType<PlayerAimAndLean>();
         }
 
         crosshairUI = FindFirstObjectByType<CrosshairController>();
@@ -206,9 +235,13 @@ public class WeaponSystem : MonoBehaviour
 
         currentAmmo--;
 
+        float recoilMultiplier = IsCurrentlyAiming() ? aimRecoilMultiplier : 1f;
+        float appliedRecoilUp = recoilUp * recoilMultiplier;
+        float appliedRecoilSide = recoilSide * recoilMultiplier;
+
         if (cameraRecoilRef != null)
         {
-            cameraRecoilRef.AddRecoil(recoilUp, recoilSide);
+            cameraRecoilRef.AddRecoil(appliedRecoilUp, appliedRecoilSide);
         }
 
         if (crosshairUI != null)
