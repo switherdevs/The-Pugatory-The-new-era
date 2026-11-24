@@ -248,10 +248,18 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: ff183df8e46e42d4ca736fd88217bf9e, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::GrenadeWeapon
+  loaiLuuDan: 0
   tenHienThiVuKhi: Frag Grenade
   soLuongLuuDanToiDa: 4
-  soLuongLuuDanKhoiDau: 0
+  soLuongLuuDanKhoiDau: 1
+  soLuongCongKhiNhat: -1
+  choPhepNhatMotPhanKhiGanDay: 0
   thoiGianNghiGiuaCacLanNem: 1.25
+  layerKhiDaNhat: 8
+  apDungLayerChoCaObjectCon: 1
+  prefabVatPhamDrop: {fileID: 7684493970595270934}
+  batTriggerKhiDrop: 0
+  banKinhColliderDrop: 0.25
   hanhDongNem: {fileID: -6877413652922633653, guid: 052faaac586de48259a63d0c4782560b, type: 3}
   hanhDongHuyNem: {fileID: 2982816287555978608, guid: 052faaac586de48259a63d0c4782560b, type: 3}
   diemXuatPhatNem: {fileID: 3603862745164106955}
@@ -301,13 +309,19 @@ MonoBehaviour:
     m_Bits: 4294967295
   kiemTraVatCanCheKhuat: 0
   lucDayVatLy: 12
+  flashCanvasObject: {fileID: 0}
+  flashImage: {fileID: 0}
+  tenLayerFlash: Flash
+  thoiGianFlashSang: 1.5
+  thoiGianFlashTan: 1.2
+  nhamMatRef: {fileID: 0}
   scriptCamera: {fileID: 0}
   cuongDoRungCamera: 1.2
   prefabHieuUngNo: {fileID: 6502662439690534543, guid: a58d7a653fcf1534bb3c3b07d33c649e, type: 3}
   thoiGianHuyHieuUngNo: 3
   nguonAmThanh: {fileID: 7722003036208009698}
   amThanhRutChot: {fileID: 8300000, guid: 98e0f4c21828be343a41069c5012a7da, type: 3}
-  amThanhNem: {fileID: 8300000, guid: 2886099789e747241ade05b6e25cafa0, type: 3}
+  amThanhNem: {fileID: 8300000, guid: 29ab6d4bd7f229d46a254cb052d940f4, type: 3}
   amThanhHuy: {fileID: 0}
   amThanhNo: {fileID: 8300000, guid: cff79a0fe26b06e4b8c3397fcc5e591d, type: 3}
   amLuong: 0.9
@@ -325,6 +339,11 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::WeaponClassifier
   category: 3
   autoDetectIfUnset: 1
+  requirePickupRadius: 1
+  pickupRadius: 2.5
+  useHorizontalDistanceXZ: 0
+  pickupAnchorOverride: {fileID: 0}
+  drawPickupGizmo: 1
   autoSwitchLayerOnEquipDrop: 1
   applyToChildren: 1
   weaponLayerIndex: 8

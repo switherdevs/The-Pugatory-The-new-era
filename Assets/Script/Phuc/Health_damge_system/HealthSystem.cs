@@ -1,6 +1,9 @@
+using System.Collections;
+using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.UI;
 using UnityEngine.Events;
+using UnityEngine.AI;
 
 public class HealthSystem : MonoBehaviour
 {
@@ -53,6 +56,22 @@ public class HealthSystem : MonoBehaviour
     [Tooltip("Lượng máu hồi phục mỗi giây.")]
     [SerializeField] private float tocDoHoiMau = 10f;
 
+    [Header("3b. Ragdoll & Chìm Xuống Đất Khi Quái Chết")]
+    [Tooltip("Bật/tắt chuyển Quái sang Ragdoll khi chết.")]
+    [SerializeField] private bool batRagdollKhiChet = true;
+
+    [Tooltip("Thời gian chờ sau khi thành Ragdoll trước khi bắt đầu chìm xuống lòng đất (giây).")]
+    [SerializeField] private float thoiGianChoTruocKhiChim = 15f;
+
+    [Tooltip("Độ sâu chìm xuống dưới mặt đất (mét).")]
+    [SerializeField] private float doSauChimXuongDat = 2.5f;
+
+    [Tooltip("Thời gian chạy hiệu ứng chìm xuống lòng đất trước khi Destroy (giây).")]
+    [SerializeField] private float thoiGianChimXuongDat = 2.5f;
+
+    [Tooltip("Nếu bật, tự bật Rigidbody/Collider cho các khớp con để làm ragdoll ngay cả khi chưa tạo sẵn Rigidbody con.")]
+    [SerializeField] private bool tuDongKichHoatKhungXuongRagdoll = true;
+
     [Header("4. Thanh máu & Thanh giáp UI (Tùy chọn)")]
     [Tooltip("Kéo Slider thanh máu của Player (trên HUD) hoặc thanh máu trên đầu Quái vào đây.")]
     [SerializeField] private Slider thanhMauSlider;
@@ -75,9 +94,6 @@ public class HealthSystem : MonoBehaviour
     [Tooltip("Prefab hiệu ứng nổ/máu/tia lửa sinh ra khi bị hạ gục (tùy chọn).")]
     [SerializeField] private GameObject hieuUngKhiChet;
 
-    [Tooltip("Thời gian trễ trước khi hủy GameObject quái sau khi chết (giây).")]
-    [SerializeField] private float thoiGianHuyKhiChet = 0.15f;
-
     [Header("6. Sự kiện mở rộng (Events)")]
     public UnityEvent<float, float> onMauThayDoi; // (mauHienTai, mauToiDa)
     public UnityEvent<float, float> onGiapThayDoi; // (giapHienTai, giapToiDa)
@@ -88,10 +104,13 @@ public class HealthSystem : MonoBehaviour
     private float giapHienTai;
     private bool daChet = false;
     private float thoiDiemTrungDonCuoi = -999f;
+    private Coroutine quyTrinhRagdollVaChimRoutine;
 
     // Tham chiếu tự động tới AI để quái quay lại truy đuổi ngay khi bị bắn từ xa
     private MeleeEnemyAI meleeAI;
     private RangedEnemyAI rangedAI;
+    private NavMeshAgent navMeshAgent;
+    private Animator animator;
 
     // Các Property công khai để UI hoặc script khác đọc
     public LoaiDoiTuong Phe => loaiDoiTuong;
@@ -128,6 +147,8 @@ public class HealthSystem : MonoBehaviour
         {
             meleeAI = GetComponent<MeleeEnemyAI>();
             rangedAI = GetComponent<RangedEnemyAI>();
+            navMeshAgent = GetComponent<NavMeshAgent>();
+            animator = GetComponentInChildren<Animator>();
         }
 
         KhoiTaoUI();
@@ -263,6 +284,12 @@ public class HealthSystem : MonoBehaviour
     /// </summary>
     public void HoiSinh()
     {
+        if (quyTrinhRagdollVaChimRoutine != null)
+        {
+            StopCoroutine(quyTrinhRagdollVaChimRoutine);
+            quyTrinhRagdollVaChimRoutine = null;
+        }
+
         daChet = false;
         mauHienTai = mauToiDa;
         giapHienTai = giapToiDa;
@@ -292,14 +319,181 @@ public class HealthSystem : MonoBehaviour
 
         if (loaiDoiTuong == LoaiDoiTuong.QuaiVat)
         {
+            // Tắt toàn bộ logic AI & điều hướng để xác quái không còn bị AI kéo/ép vị trí
             if (meleeAI != null) meleeAI.enabled = false;
             if (rangedAI != null) rangedAI.enabled = false;
 
-            Collider col = GetComponent<Collider>();
-            if (col != null) col.enabled = false;
+            if (navMeshAgent != null)
+            {
+                if (navMeshAgent.enabled)
+                {
+                    navMeshAgent.isStopped = true;
+                    navMeshAgent.ResetPath();
+                }
+                navMeshAgent.enabled = false;
+            }
 
-            Destroy(gameObject, Mathf.Max(0f, thoiGianHuyKhiChet));
+            // Tắt Animator để ragdoll hoạt động tự do thay vì bị animation khóa tư thế
+            if (animator != null)
+            {
+                animator.enabled = false;
+            }
+
+            // Tắt các MonoBehaviour khác trên quái (trừ HealthSystem) để không can thiệp transform/physics khi đang nằm xác
+            MonoBehaviour[] cacScriptKhac = GetComponentsInChildren<MonoBehaviour>(true);
+            for (int i = 0; i < cacScriptKhac.Length; i++)
+            {
+                MonoBehaviour mb = cacScriptKhac[i];
+                if (mb == null || mb == this) continue;
+                string tenType = mb.GetType().Name.ToLowerInvariant();
+                if (tenType.Contains("ai") || tenType.Contains("enemy") || tenType.Contains("attack") || tenType.Contains("controller") || tenType.Contains("movement"))
+                {
+                    mb.enabled = false;
+                }
+            }
+
+            if (quyTrinhRagdollVaChimRoutine != null)
+            {
+                StopCoroutine(quyTrinhRagdollVaChimRoutine);
+            }
+            quyTrinhRagdollVaChimRoutine = StartCoroutine(RagdollRoiCho15GiayRoiChimXuongDat());
         }
+    }
+
+    /// <summary>
+    /// Bỏ khóa Freeze Rotation (X, Y, Z) trên Rigidbody để ragdoll xoay/đổ tự nhiên.
+    /// </summary>
+    private static void MoKhoaRotationRigidbody(Rigidbody rb)
+    {
+        if (rb == null) return;
+        rb.constraints &= ~RigidbodyConstraints.FreezeRotation;
+    }
+
+    private IEnumerator RagdollRoiCho15GiayRoiChimXuongDat()
+    {
+        // 1. Kích hoạt Ragdoll: bật Rigidbody & Collider trên các khớp/xương con và bỏ khóa rotation nếu có tick
+        Rigidbody[] rbs = GetComponentsInChildren<Rigidbody>(true);
+        Collider[] cols = GetComponentsInChildren<Collider>(true);
+
+        if (batRagdollKhiChet)
+        {
+            for (int i = 0; i < cols.Length; i++)
+            {
+                if (cols[i] != null)
+                {
+                    cols[i].enabled = true;
+                    cols[i].isTrigger = false;
+                }
+            }
+
+            bool coRigidbodyCon = false;
+            for (int i = 0; i < rbs.Length; i++)
+            {
+                Rigidbody rb = rbs[i];
+                if (rb == null) continue;
+
+                // Bỏ tick Freeze Rotation (FreezeRotationX / Y / Z) để ragdoll đổ tự do
+                MoKhoaRotationRigidbody(rb);
+
+                rb.isKinematic = false;
+                rb.useGravity = true;
+                rb.linearVelocity = Vector3.zero;
+                rb.angularVelocity = Vector3.zero;
+                rb.interpolation = RigidbodyInterpolation.Interpolate;
+                rb.collisionDetectionMode = CollisionDetectionMode.Continuous;
+                if (rb.gameObject != gameObject)
+                {
+                    coRigidbodyCon = true;
+                }
+            }
+
+            // Nếu quái chưa dựng sẵn ragdoll con mà bật tự động kích hoạt khung xương:
+            // bật Rigidbody cho các Transform con có Renderer/Collider (tránh gắn trùng vô tội vạ nếu đã có sẵn)
+            if (!coRigidbodyCon && tuDongKichHoatKhungXuongRagdoll)
+            {
+                Transform[] children = GetComponentsInChildren<Transform>(true);
+                for (int i = 0; i < children.Length; i++)
+                {
+                    Transform t = children[i];
+                    if (t == null || t == transform) continue;
+
+                    bool coCol = t.TryGetComponent(out Collider c);
+                    bool coMesh = t.TryGetComponent(out Renderer _);
+                    if (!coCol && !coMesh) continue;
+
+                    if (!coCol)
+                    {
+                        SphereCollider sc = t.gameObject.AddComponent<SphereCollider>();
+                        sc.radius = 0.12f;
+                    }
+                    else
+                    {
+                        c.enabled = true;
+                        c.isTrigger = false;
+                    }
+
+                    if (!t.TryGetComponent(out Rigidbody boneRb))
+                    {
+                        boneRb = t.gameObject.AddComponent<Rigidbody>();
+                    }
+                    MoKhoaRotationRigidbody(boneRb);
+                    boneRb.mass = Mathf.Max(0.5f, boneRb.mass);
+                    boneRb.isKinematic = false;
+                    boneRb.useGravity = true;
+                    boneRb.interpolation = RigidbodyInterpolation.Interpolate;
+                    boneRb.collisionDetectionMode = CollisionDetectionMode.Continuous;
+                }
+            }
+        }
+
+        // 2. Đứng yên/nằm ragdoll trên mặt đất đủ 15 giây (hoặc thời gian cấu hình)
+        float choThoiGian = Mathf.Max(0f, thoiGianChoTruocKhiChim);
+        if (choThoiGian > 0f)
+        {
+            yield return new WaitForSeconds(choThoiGian);
+        }
+
+        // 3. Trước khi chìm xuống lòng đất: chuyển các Rigidbody sang kinematic & tắt collider cản đường
+        // để quái chìm mượt xuống đất mà không bị vật lý đẩy giật ngược lên
+        rbs = GetComponentsInChildren<Rigidbody>(true);
+        for (int i = 0; i < rbs.Length; i++)
+        {
+            if (rbs[i] == null) continue;
+            rbs[i].linearVelocity = Vector3.zero;
+            rbs[i].angularVelocity = Vector3.zero;
+            rbs[i].isKinematic = true;
+            rbs[i].useGravity = false;
+        }
+
+        cols = GetComponentsInChildren<Collider>(true);
+        for (int i = 0; i < cols.Length; i++)
+        {
+            if (cols[i] != null)
+            {
+                cols[i].enabled = false;
+            }
+        }
+
+        // 4. Chìm từ từ xuống lòng đất rồi hủy GameObject
+        float thoiGianChim = Mathf.Max(0.1f, thoiGianChimXuongDat);
+        float doSau = Mathf.Max(0.1f, doSauChimXuongDat);
+
+        Vector3 viTriBatDau = transform.position;
+        Vector3 viTriDich = viTriBatDau + Vector3.down * doSau;
+
+        float elapsed = 0f;
+        while (elapsed < thoiGianChim)
+        {
+            elapsed += Time.deltaTime;
+            float t = Mathf.Clamp01(elapsed / thoiGianChim);
+            float smoothT = Mathf.SmoothStep(0f, 1f, t);
+            transform.position = Vector3.Lerp(viTriBatDau, viTriDich, smoothT);
+            yield return null;
+        }
+
+        transform.position = viTriDich;
+        quyTrinhRagdollVaChimRoutine = null;
+        Destroy(gameObject);
     }
 
     private void KhoiTaoUI()

@@ -1,4 +1,5 @@
 using System.Collections;
+using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.InputSystem;
 
@@ -8,7 +9,7 @@ public class WeaponSwitcher : MonoBehaviour
     public const int MaxWeaponSlots = 5; // 0: Chinh, 1: Phu, 2: Can chien, 3: Luu dan, 4: Ho tro
 
     [Header("Weapon Settings (5 Index Co Dinh: 0..4)")]
-    [Tooltip("Mang 5 o: [0] Vu khi chinh, [1] Vu khi phu, [2] Can chien, [3] Luu dan, [4] Thiet bi ho tro.")]
+    [Tooltip("Mang 5 o: [0] Vu khi chinh, [1] Vu khi phu, [2] Can chien, [3] Luu dan (chi 1 loai: Frag hoac Flashbang), [4] Thiet bi ho tro.")]
     [SerializeField] private GameObject[] weapons = new GameObject[MaxWeaponSlots];
 
     [Tooltip("GameObject Holder chua vu khi khi nhat/cam tren tay (neu de trong se tu lay chinh GameObject nay).")]
@@ -31,6 +32,12 @@ public class WeaponSwitcher : MonoBehaviour
     [SerializeField] private Vector3 defaultEquippedLocalEuler = Vector3.zero;
     [SerializeField] private float dropForwardForce = 4.5f;
     [SerializeField] private float dropUpwardForce = 2.0f;
+
+    [Tooltip("Bat/tat co che khoa tam thoi cho phep nhat lai sau khi bo luu dan ra ngoai.")]
+    [SerializeField] private bool khoaTamThoiChoNhatLaiSauKhiBo = true;
+
+    [Tooltip("Thoi gian ngan (giay) sau khi bo luu dan ra ngoai truoc khi cho phep nhat lai de tranh bi nhat ngay luc vua vut.")]
+    [SerializeField] private float thoiGianChoNhatLaiSauKhiBo = 0.65f;
 
     [Header("=== 1. HOLSTER SETTINGS (CAT VU KHI) ===")]
     [Tooltip("Do dich chuyen vi tri Y khi cat sung (Nhap so am tuy y, vi du: -0.4).")]
@@ -65,6 +72,8 @@ public class WeaponSwitcher : MonoBehaviour
     private Coroutine switchCoroutine;
     private bool isSwitchesInProgress = false;
 
+    private readonly Dictionary<GameObject, float> danhSachLuuDanTamThoiKhoaNhat = new Dictionary<GameObject, float>();
+
     private InputAction runtimePickupAction;
     private InputAction runtimeDropAction;
 
@@ -76,13 +85,13 @@ public class WeaponSwitcher : MonoBehaviour
 
     public Transform HolderTransform => weaponHolder != null ? weaponHolder : transform;
     public int CurrentWeaponIndex => currentWeaponIndex;
+    public bool IsSwitchingWeapon => isSwitchesInProgress;
 
     public WeaponSystem CurrentWeaponSystem => (weaponSystems != null && currentWeaponIndex >= 0 && currentWeaponIndex < weaponSystems.Length) ? weaponSystems[currentWeaponIndex] : null;
     public SniperWeapon CurrentSniperWeapon => (sniperWeapons != null && currentWeaponIndex >= 0 && currentWeaponIndex < sniperWeapons.Length) ? sniperWeapons[currentWeaponIndex] : null;
     public MeleeWeapon CurrentMeleeWeapon => (meleeWeapons != null && currentWeaponIndex >= 0 && currentWeaponIndex < meleeWeapons.Length) ? meleeWeapons[currentWeaponIndex] : null;
     public GrenadeWeapon CurrentGrenadeWeapon => (grenadeWeapons != null && currentWeaponIndex >= 0 && currentWeaponIndex < grenadeWeapons.Length) ? grenadeWeapons[currentWeaponIndex] : null;
 
-    // Lay nhanh GrenadeWeapon dang nam o o Luu dan (Slot 3)
     public GrenadeWeapon EquippedGrenadeSlot => (grenadeWeapons != null && grenadeWeapons.Length > (int)WeaponCategory.Grenade)
         ? grenadeWeapons[(int)WeaponCategory.Grenade]
         : null;
@@ -168,7 +177,7 @@ public class WeaponSwitcher : MonoBehaviour
         if (firstIdx >= 0 && weapons[firstIdx] != null && CoTheChonSlot(firstIdx))
         {
             weapons[firstIdx].SetActive(true);
-            StartCoroutine(PlayEquipAnimation(
+            switchCoroutine = StartCoroutine(PlayEquipAnimation(
                 weapons[firstIdx].transform,
                 originalLocalPositions[firstIdx],
                 originalLocalRotations[firstIdx]
@@ -176,11 +185,11 @@ public class WeaponSwitcher : MonoBehaviour
         }
     }
 
-    // Kiem tra slot co vu khi hop le de rut ra cam hay khong (neu la luu dan ma het dan thi khong cho chon)
     public bool CoTheChonSlot(int index)
     {
         if (weapons == null || index < 0 || index >= MaxWeaponSlots) return false;
         if (weapons[index] == null) return false;
+        if (!weapons[index].transform.IsChildOf(HolderTransform)) return false;
 
         if (grenadeWeapons != null && index < grenadeWeapons.Length && grenadeWeapons[index] != null)
         {
@@ -190,7 +199,6 @@ public class WeaponSwitcher : MonoBehaviour
         return true;
     }
 
-    // Duoc goi tu GrenadeWeapon ngay khi nem het qua luu dan cuoi cung
     public void XuLyKhiHetLuuDanChuyenVeIndex0()
     {
         int slotLuuDan = (int)WeaponCategory.Grenade;
@@ -206,7 +214,6 @@ public class WeaponSwitcher : MonoBehaviour
             isSwitchesInProgress = false;
         }
 
-        // Uu tien chuyen select ve index 0 neu index 0 hop le; neu index 0 trong thi tim vu khi hop le gan nhat
         int targetIndex = CoTheChonSlot(0) ? 0 : FindFirstValidWeaponIndex(0);
         if (targetIndex >= 0 && weapons[targetIndex] != null)
         {
@@ -224,18 +231,30 @@ public class WeaponSwitcher : MonoBehaviour
         }
     }
 
-    // Sap xep cac vu khi ban dau vao dung index phan loai (0..4) cua chung
     private void ArrangeWeaponsIntoClassifiedSlots()
     {
         GameObject[] arranged = new GameObject[MaxWeaponSlots];
+        int grenadeSlot = (int)WeaponCategory.Grenade;
 
         for (int i = 0; i < MaxWeaponSlots; i++)
         {
             GameObject w = weapons[i];
             if (w == null) continue;
 
-            int classifiedIndex = WeaponClassifier.GetWeaponSlotIndex(w);
-            classifiedIndex = Mathf.Clamp(classifiedIndex, 0, MaxWeaponSlots - 1);
+            int classifiedIndex = Mathf.Clamp(WeaponClassifier.GetWeaponSlotIndex(w), 0, MaxWeaponSlots - 1);
+
+            if (classifiedIndex == grenadeSlot)
+            {
+                if (arranged[grenadeSlot] == null)
+                {
+                    arranged[grenadeSlot] = w;
+                }
+                else
+                {
+                    w.SetActive(false);
+                }
+                continue;
+            }
 
             if (arranged[classifiedIndex] == null)
             {
@@ -250,7 +269,6 @@ public class WeaponSwitcher : MonoBehaviour
         weapons = arranged;
     }
 
-    // Dam bao cac vu khi/luu dan da gan san trong mang deu thuoc con cua weaponHolder
     private void GanCacVuKhiBanDauVaoHolder()
     {
         Transform holder = HolderTransform;
@@ -273,11 +291,19 @@ public class WeaponSwitcher : MonoBehaviour
             }
 
             WeaponClassifier.RefreshWeaponLayer(w);
+
+            // Goi lai sau RefreshWeaponLayer de layer chon trong dropdown cua GrenadeWeapon luon duoc giu
+            if (grenadeComp != null)
+            {
+                grenadeComp.ApDungLayerKhiDaNhat();
+            }
         }
     }
 
     private void Update()
     {
+        DonDepDanhSachKhoaNhatTamThoi();
+
         if (isSwitchesInProgress) return;
 
         if (ActivePickupAction != null && ActivePickupAction.WasPressedThisFrame())
@@ -322,6 +348,71 @@ public class WeaponSwitcher : MonoBehaviour
         }
     }
 
+    private void DonDepDanhSachKhoaNhatTamThoi()
+    {
+        if (danhSachLuuDanTamThoiKhoaNhat.Count == 0) return;
+
+        List<GameObject> canXoa = null;
+        foreach (KeyValuePair<GameObject, float> item in danhSachLuuDanTamThoiKhoaNhat)
+        {
+            if (item.Key == null || Time.time >= item.Value)
+            {
+                if (canXoa == null) canXoa = new List<GameObject>();
+                canXoa.Add(item.Key);
+            }
+        }
+
+        if (canXoa != null)
+        {
+            for (int i = 0; i < canXoa.Count; i++)
+            {
+                danhSachLuuDanTamThoiKhoaNhat.Remove(canXoa[i]);
+            }
+        }
+    }
+
+    private bool DangTamKhoaNhatLai(GameObject candidate)
+    {
+        if (!khoaTamThoiChoNhatLaiSauKhiBo || candidate == null) return false;
+        if (danhSachLuuDanTamThoiKhoaNhat.TryGetValue(candidate, out float thoiDiemMoKhoa))
+        {
+            if (Time.time < thoiDiemMoKhoa)
+            {
+                return true;
+            }
+            danhSachLuuDanTamThoiKhoaNhat.Remove(candidate);
+        }
+        return false;
+    }
+
+    private bool NamTrongBanKinhNhatHopLe(GameObject candidate, Transform searchOrigin)
+    {
+        if (candidate == null || searchOrigin == null) return false;
+
+        float sqrDist = (candidate.transform.position - searchOrigin.position).sqrMagnitude;
+        if (sqrDist > pickupRange * pickupRange)
+        {
+            return false;
+        }
+
+        WeaponClassifier classifier = candidate.GetComponent<WeaponClassifier>();
+        if (classifier == null)
+        {
+            classifier = candidate.GetComponentInChildren<WeaponClassifier>(true);
+        }
+
+        if (classifier != null && classifier.RequirePickupRadius)
+        {
+            if (!classifier.IsWithinPickupRadius(searchOrigin.position) &&
+                !classifier.IsWithinPickupRadius(transform.position))
+            {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
     public bool TryPickupNearbyWeapon()
     {
         Transform searchOrigin = Camera.main != null ? Camera.main.transform : transform;
@@ -334,7 +425,9 @@ public class WeaponSwitcher : MonoBehaviour
         for (int i = 0; i < hits.Length; i++)
         {
             GameObject candidate = ResolvePickupWeaponObject(hits[i].gameObject);
-            if (candidate == null || IsAlreadyOwned(candidate)) continue;
+            if (candidate == null || IsAlreadyOwned(candidate) || DangTamKhoaNhatLai(candidate)) continue;
+            if (!NamTrongBanKinhNhatHopLe(candidate, searchOrigin)) continue;
+            if (LaLuuDanCungLoaiVaDaDay(candidate)) continue;
 
             float dist = Vector3.Distance(searchOrigin.position, candidate.transform.position);
             if (dist < bestDist)
@@ -348,79 +441,146 @@ public class WeaponSwitcher : MonoBehaviour
         return EquipPickedUpWeapon(bestCandidate);
     }
 
-    // Nhat vu khi/luu dan: gan lam con cua weaponHolder, dung vat ly, chuyen layer va xep vao dung slot (0..4)
-    public bool EquipPickedUpWeapon(GameObject pickedWeapon)
+    private bool LaLuuDanCungLoaiVaDaDay(GameObject candidate)
     {
-        if (pickedWeapon == null || IsAlreadyOwned(pickedWeapon)) return false;
-
-        WeaponCategory category = WeaponClassifier.GetWeaponCategory(pickedWeapon);
-        int targetIndex = (int)category;
-
-        // Neu da co object luu dan o slot 3 (ke ca khi dang an do het dan) -> cong them luu dan, GIU AN cho toi khi nguoi choi chon slot
-        if (category == WeaponCategory.Grenade && targetIndex >= 0 && targetIndex < MaxWeaponSlots && weapons[targetIndex] != null)
+        if (candidate == null) return false;
+        int grenadeSlot = (int)WeaponCategory.Grenade;
+        if (weapons == null || grenadeSlot < 0 || grenadeSlot >= MaxWeaponSlots || weapons[grenadeSlot] == null)
         {
-            GrenadeWeapon existingGrenade = weapons[targetIndex].GetComponentInChildren<GrenadeWeapon>(true);
-            GrenadeWeapon pickedGrenade = pickedWeapon.GetComponentInChildren<GrenadeWeapon>(true);
-            if (existingGrenade != null)
-            {
-                int addCount = pickedGrenade != null ? Mathf.Max(1, pickedGrenade.CurrentGrenadeCount) : 1;
-                existingGrenade.AddGrenades(addCount);
-                Destroy(pickedWeapon);
+            return false;
+        }
 
-                // Chi hien lai neu nguoi choi dang chon dung slot luu dan
-                if (currentWeaponIndex == targetIndex)
-                {
-                    weapons[targetIndex].SetActive(true);
-                }
-                else
-                {
-                    weapons[targetIndex].SetActive(false);
-                }
+        GrenadeWeapon existingGrenade = weapons[grenadeSlot].GetComponentInChildren<GrenadeWeapon>(true);
+        GrenadeWeapon pickedGrenade = candidate.GetComponentInChildren<GrenadeWeapon>(true);
+
+        if (existingGrenade != null && pickedGrenade != null &&
+            existingGrenade.CurrentGrenadeType == pickedGrenade.CurrentGrenadeType)
+        {
+            if (existingGrenade.DaDayLuuDan)
+            {
                 return true;
+            }
+
+            if (!existingGrenade.ChoPhepNhatMotPhanKhiGanDay)
+            {
+                int soLuongCanThem = pickedGrenade.SoLuongCongKhiDuocNhat;
+                int soLuongConThieu = existingGrenade.MaxGrenadeCount - existingGrenade.CurrentGrenadeCount;
+                if (soLuongCanThem > soLuongConThieu)
+                {
+                    return true;
+                }
             }
         }
 
-        if (targetIndex < 0 || targetIndex >= MaxWeaponSlots || weapons[targetIndex] != null)
+        return false;
+    }
+
+    public bool EquipPickedUpWeapon(GameObject pickedWeapon, bool autoEquipIfGrenade = false)
+    {
+        if (pickedWeapon == null || IsAlreadyOwned(pickedWeapon) || DangTamKhoaNhatLai(pickedWeapon)) return false;
+
+        WeaponCategory category = WeaponClassifier.GetWeaponCategory(pickedWeapon);
+        int targetIndex = (int)category;
+        if (targetIndex < 0 || targetIndex >= MaxWeaponSlots) return false;
+
+        if (category == WeaponCategory.Grenade && weapons[targetIndex] != null)
+        {
+            GrenadeWeapon existingGrenade = weapons[targetIndex].GetComponentInChildren<GrenadeWeapon>(true);
+            GrenadeWeapon pickedGrenade = pickedWeapon.GetComponentInChildren<GrenadeWeapon>(true);
+
+            bool cungLoai = existingGrenade != null &&
+                            pickedGrenade != null &&
+                            existingGrenade.CurrentGrenadeType == pickedGrenade.CurrentGrenadeType;
+
+            if (cungLoai)
+            {
+                if (existingGrenade.DaDayLuuDan)
+                {
+                    return false;
+                }
+
+                int addCount = pickedGrenade != null ? pickedGrenade.SoLuongCongKhiDuocNhat : 1;
+                int added = existingGrenade.AddGrenades(addCount);
+                if (added <= 0)
+                {
+                    return false;
+                }
+
+                // Dam bao layer da nhat duoc ap dung sau khi cong don luu dan
+                existingGrenade.ApDungLayerKhiDaNhat();
+
+                Destroy(pickedWeapon);
+
+                weapons[targetIndex].SetActive(existingGrenade.ConLuuDan && (currentWeaponIndex == targetIndex || autoEquipIfGrenade));
+                if (autoEquipIfGrenade && existingGrenade.ConLuuDan && currentWeaponIndex != targetIndex)
+                {
+                    StartSwitchToWeapon(targetIndex);
+                }
+                return true;
+            }
+
+            // Khac loai luu dan: bo qua luu dan dang giu ra map (va dam bao hien thi lai) de nguoi choi co the nhat lai doi qua lai
+            if (existingGrenade != null && existingGrenade.ConLuuDan)
+            {
+                DropGrenadeObject(targetIndex, weapons[targetIndex], existingGrenade, switchToOtherWeapon: false, khoaTamThoiChoVatMoi: pickedWeapon);
+            }
+            else
+            {
+                Destroy(weapons[targetIndex]);
+                weapons[targetIndex] = null;
+                RebuildWeaponCaches(initialSetup: false);
+            }
+        }
+
+        if (weapons[targetIndex] != null)
         {
             return false;
         }
 
         Transform holder = HolderTransform;
+        Vector3 savedScale = pickedWeapon.transform.localScale;
 
-        Rigidbody rb = pickedWeapon.GetComponent<Rigidbody>();
-        if (rb != null)
+        GrenadeWeapon grenadeComp = pickedWeapon.GetComponentInChildren<GrenadeWeapon>(true);
+        if (grenadeComp != null)
         {
-            rb.linearVelocity = Vector3.zero;
-            rb.angularVelocity = Vector3.zero;
-            rb.isKinematic = true;
+            grenadeComp.enabled = false;
+        }
+
+        Rigidbody[] rbs = pickedWeapon.GetComponentsInChildren<Rigidbody>(true);
+        for (int i = 0; i < rbs.Length; i++)
+        {
+            if (rbs[i] == null) continue;
+            rbs[i].linearVelocity = Vector3.zero;
+            rbs[i].angularVelocity = Vector3.zero;
+            rbs[i].isKinematic = true;
+            rbs[i].useGravity = false;
+            rbs[i].interpolation = RigidbodyInterpolation.None;
         }
 
         Collider[] cols = pickedWeapon.GetComponentsInChildren<Collider>(true);
         for (int i = 0; i < cols.Length; i++)
         {
-            cols[i].enabled = false;
+            if (cols[i] != null) cols[i].enabled = false;
         }
-
-        Vector3 savedScale = pickedWeapon.transform.localScale;
 
         pickedWeapon.transform.SetParent(holder, false);
         pickedWeapon.transform.localPosition = defaultEquippedLocalPosition;
         pickedWeapon.transform.localRotation = Quaternion.Euler(defaultEquippedLocalEuler);
         pickedWeapon.transform.localScale = savedScale;
 
-        GrenadeWeapon grenadeComp = pickedWeapon.GetComponentInChildren<GrenadeWeapon>(true);
-        if (grenadeComp != null)
-        {
-            grenadeComp.DongBoTrangThaiSauKhiGanHolder(defaultEquippedLocalPosition, Quaternion.Euler(defaultEquippedLocalEuler));
-        }
-
         WeaponClassifier.RefreshWeaponLayer(pickedWeapon);
 
         weapons[targetIndex] = pickedWeapon;
         RebuildWeaponCaches(initialSetup: false);
 
-        // Neu nhặt luu dan lan dau khi dang cam vu khi khac -> chi cong vao slot, khong bat/chuyen sang ngay
-        if (category == WeaponCategory.Grenade && currentWeaponIndex != targetIndex)
+        if (grenadeComp != null)
+        {
+            grenadeComp.DongBoTrangThaiSauKhiGanHolder(originalLocalPositions[targetIndex], originalLocalRotations[targetIndex]);
+            // Ap dung layer da chon trong dropdown sau RefreshWeaponLayer de khong bi ghi de
+            grenadeComp.ApDungLayerKhiDaNhat();
+        }
+
+        if (category == WeaponCategory.Grenade && currentWeaponIndex != targetIndex && !autoEquipIfGrenade)
         {
             pickedWeapon.SetActive(false);
             return true;
@@ -437,15 +597,15 @@ public class WeaponSwitcher : MonoBehaviour
         int previousIndex = currentWeaponIndex;
         currentWeaponIndex = targetIndex;
 
+        if (switchCoroutine != null) StopCoroutine(switchCoroutine);
+
         if (previousIndex >= 0 && previousIndex < MaxWeaponSlots && previousIndex != targetIndex && weapons[previousIndex] != null)
         {
-            if (switchCoroutine != null) StopCoroutine(switchCoroutine);
             switchCoroutine = StartCoroutine(SwitchWeaponSequence(previousIndex, targetIndex));
         }
         else
         {
             pickedWeapon.SetActive(true);
-            if (switchCoroutine != null) StopCoroutine(switchCoroutine);
             switchCoroutine = StartCoroutine(PlayEquipAnimation(
                 pickedWeapon.transform,
                 originalLocalPositions[targetIndex],
@@ -472,6 +632,18 @@ public class WeaponSwitcher : MonoBehaviour
         }
 
         int droppedIndex = currentWeaponIndex;
+        GrenadeWeapon droppedGrenade = weaponToDrop.GetComponentInChildren<GrenadeWeapon>(true);
+        if (droppedGrenade != null)
+        {
+            return DropGrenadeObject(droppedIndex, weaponToDrop, droppedGrenade, switchToOtherWeapon: true);
+        }
+
+        DropWeaponObject(droppedIndex, weaponToDrop, switchToOtherWeapon: true);
+        return true;
+    }
+
+    private void DropWeaponObject(int droppedIndex, GameObject weaponToDrop, bool switchToOtherWeapon)
+    {
         Transform dropRef = Camera.main != null ? Camera.main.transform : transform;
         Vector3 dropPos = dropRef.position + dropRef.forward * 1.1f + Vector3.up * 0.1f;
         Vector3 dropDir = (dropRef.forward * dropForwardForce) + (dropRef.up * dropUpwardForce);
@@ -484,6 +656,19 @@ public class WeaponSwitcher : MonoBehaviour
         if (originalLocalScales != null && droppedIndex < originalLocalScales.Length)
         {
             weaponToDrop.transform.localScale = originalLocalScales[droppedIndex];
+        }
+
+        Renderer[] renderers = weaponToDrop.GetComponentsInChildren<Renderer>(true);
+        for (int i = 0; i < renderers.Length; i++)
+        {
+            if (renderers[i] != null)
+            {
+                renderers[i].enabled = true;
+                if (!renderers[i].gameObject.activeSelf)
+                {
+                    renderers[i].gameObject.SetActive(true);
+                }
+            }
         }
 
         WeaponClassifier.RefreshWeaponLayer(weaponToDrop);
@@ -500,12 +685,80 @@ public class WeaponSwitcher : MonoBehaviour
             rb = weaponToDrop.AddComponent<Rigidbody>();
         }
         rb.isKinematic = false;
+        rb.useGravity = true;
+        rb.interpolation = RigidbodyInterpolation.Interpolate;
         rb.linearVelocity = Vector3.zero;
         rb.angularVelocity = Vector3.zero;
         rb.AddForce(dropDir, ForceMode.Impulse);
 
         weapons[droppedIndex] = null;
         RebuildWeaponCaches(initialSetup: false);
+
+        if (!switchToOtherWeapon) return;
+
+        int nextIdx = GetNextValidWeaponIndex(droppedIndex, 1);
+        if (nextIdx >= 0)
+        {
+            currentWeaponIndex = nextIdx;
+            weapons[currentWeaponIndex].SetActive(true);
+            weapons[currentWeaponIndex].transform.localPosition = originalLocalPositions[currentWeaponIndex];
+            weapons[currentWeaponIndex].transform.localRotation = originalLocalRotations[currentWeaponIndex];
+        }
+        else
+        {
+            currentWeaponIndex = 0;
+        }
+    }
+
+    private bool DropGrenadeObject(
+        int droppedIndex,
+        GameObject grenadeObj,
+        GrenadeWeapon grenadeComp,
+        bool switchToOtherWeapon,
+        GameObject khoaTamThoiChoVatMoi = null)
+    {
+        int soLuongVut = grenadeComp != null ? grenadeComp.CurrentGrenadeCount : 1;
+        GrenadeWeapon.LoaiLuuDan loaiVut = grenadeComp != null ? grenadeComp.CurrentGrenadeType : GrenadeWeapon.LoaiLuuDan.FragGrenade;
+        int soLuongToiDaVut = grenadeComp != null ? grenadeComp.MaxGrenadeCount : 4;
+        GameObject prefabDropTuyChon = grenadeComp != null ? grenadeComp.PrefabVatPhamDrop : null;
+
+        weapons[droppedIndex] = null;
+        if (grenadeObj != null)
+        {
+            Destroy(grenadeObj);
+        }
+        RebuildWeaponCaches(initialSetup: false);
+
+        if (soLuongVut > 0 && prefabDropTuyChon != null)
+        {
+            Transform dropRef = Camera.main != null ? Camera.main.transform : transform;
+            Vector3 dropPos = dropRef.position + dropRef.forward * 1.1f + Vector3.up * 0.1f;
+            Vector3 dropDir = (dropRef.forward * dropForwardForce) + (dropRef.up * dropUpwardForce);
+
+            GameObject physicalDrop = Instantiate(prefabDropTuyChon, dropPos, Quaternion.LookRotation(dropRef.forward, Vector3.up));
+            physicalDrop.name = loaiVut == GrenadeWeapon.LoaiLuuDan.Flashbang ? "Dropped_Flashbang" : "Dropped_FragGrenade";
+
+            GrenadeWeapon droppedComp = physicalDrop.GetComponentInChildren<GrenadeWeapon>(true);
+            if (droppedComp == null)
+                droppedComp = physicalDrop.AddComponent<GrenadeWeapon>();
+
+            droppedComp.ThietLapLoaiVaSoLuong(loaiVut, Mathf.Clamp(soLuongVut, 1, soLuongToiDaVut), soLuongToiDaVut);
+            droppedComp.enabled = false;
+
+            GrenadeWeapon.HienThiLaiVatPhamDrop(physicalDrop, loaiVut, null,
+                grenadeComp != null && grenadeComp.BatTriggerKhiDrop,
+                grenadeComp != null ? grenadeComp.BanKinhColliderDrop : 0.25f,
+                transform.root);
+
+            Rigidbody rb = physicalDrop.GetComponent<Rigidbody>();
+            if (rb != null)
+                rb.AddForce(dropDir, ForceMode.Impulse);
+
+            if (khoaTamThoiChoNhatLaiSauKhiBo && khoaTamThoiChoVatMoi != null && thoiGianChoNhatLaiSauKhiBo > 0f)
+                danhSachLuuDanTamThoiKhoaNhat[physicalDrop] = Time.time + thoiGianChoNhatLaiSauKhiBo;
+        }
+
+        if (!switchToOtherWeapon) return true;
 
         int nextIdx = GetNextValidWeaponIndex(droppedIndex, 1);
         if (nextIdx >= 0)
@@ -572,8 +825,17 @@ public class WeaponSwitcher : MonoBehaviour
                 bool wasActive = weapons[i].activeSelf;
                 weapons[i].SetActive(true);
 
-                originalLocalPositions[i] = weapons[i].transform.localPosition;
-                originalLocalRotations[i] = weapons[i].transform.localRotation;
+                if (weapons[i].transform.parent == HolderTransform)
+                {
+                    originalLocalPositions[i] = defaultEquippedLocalPosition;
+                    originalLocalRotations[i] = Quaternion.Euler(defaultEquippedLocalEuler);
+                }
+                else
+                {
+                    originalLocalPositions[i] = weapons[i].transform.localPosition;
+                    originalLocalRotations[i] = weapons[i].transform.localRotation;
+                }
+
                 originalLocalScales[i] = weapons[i].transform.localScale;
 
                 weaponSystems[i] = weapons[i].GetComponent<WeaponSystem>();

@@ -1,12 +1,12 @@
 using UnityEngine;
+using UnityEngine.InputSystem;
 
-// Phan loai loai dan cua hop dan hien thi duoi dang Dropdown tren Inspector
+// Phan loai loai dan cua hop dan (da loai bo DanLuuDan va DanFlashbang vi luu dan tu hoat dong nhu vu khi + tiep dan)
 public enum LoaiDanHopDan
 {
-    DanVuKhiThuong = 0,     // Cong dan du phong cho WeaponSystem
-    DanSungTia = 1,          // Cong dan du phong cho SniperWeapon
-    DanLuuDan = 2,           // Cong so luong cho GrenadeWeapon
-    TuDongTheoVuKhiDangCam = 3 // Tu cong theo vu khi dang cam tren tay
+    DanVuKhiThuong = 0,       // Cong dan du phong cho WeaponSystem
+    DanSungTia = 1,            // Cong dan du phong cho SniperWeapon
+    TuDongTheoVuKhiDangCam = 2 // Tu cong theo vu khi dang cam tren tay (khong ap dung cho luu dan)
 }
 
 [RequireComponent(typeof(Collider))]
@@ -14,46 +14,126 @@ public enum LoaiDanHopDan
 public class AmmoBox : MonoBehaviour
 {
     [Header("Phan Loai & So Luong Dan")]
-    [Tooltip("Chon loai dan cua hop dan nay qua Dropdown (Vu khi thuong, Sung tia, Luu dan, hoac Tu dong).")]
+    [Tooltip("Chon loai dan cua hop dan nay qua Dropdown.")]
     [SerializeField] private LoaiDanHopDan loaiDan = LoaiDanHopDan.DanVuKhiThuong;
 
-    [Tooltip("So luong dan hoac luu dan duoc cong them khi nhat hop dan.")]
+    [Tooltip("So luong dan du phong duoc cong them khi nhat hop dan.")]
     [SerializeField] private int soLuongDanCongThem = 30;
 
     [Tooltip("Tag cua doi tuong nguoi choi.")]
     [SerializeField] private string tagNguoiChoi = "Player";
 
-    [Tooltip("Neu bat, khi nhat hop dan luu dan se tu dong chuyen sang slot luu dan neu truoc do het dan.")]
-    [SerializeField] private bool tuDongChuyenSangLuuDanKhiNhat = false;
+    [Header("Che Do Nhat Phim E")]
+    [Tooltip("Neu bat, khi o gan hop dan se nhat khi nhan phim E (hoac InputAction nhat); neu tat se nhat ngay khi cham.")]
+    [SerializeField] private bool nhatBangPhimE = true;
+
+    [Tooltip("Khoang cach toi da cho phep nhan phim E nhat hop dan.")]
+    [SerializeField] private float khoangCachNhatPhimE = 3.5f;
+
+    [Tooltip("Tuy chon InputActionReference neu dung Action Asset rieng; de trong se tu dung phim E.")]
+    [SerializeField] private InputActionReference hanhDongNhatPhimE;
+
+    private InputAction hanhDongNhatTamThoi;
+    private Collider vaChamHopDan;
+    private Rigidbody vatLyHopDan;
+
+    // Cache tham chieu nguoi choi de giam quet scene moi frame
+    private Transform cachedPlayerRoot;
+    private WeaponSwitcher cachedWeaponSwitcher;
+
+    private InputAction HanhDongNhatDangDung =>
+        hanhDongNhatPhimE != null && hanhDongNhatPhimE.action != null
+            ? hanhDongNhatPhimE.action
+            : hanhDongNhatTamThoi;
 
     private void Awake()
     {
-        // Dam bao Collider luon la Trigger de nguoi choi di vao nhat duoc
-        Collider vaCham = GetComponent<Collider>();
-        if (vaCham != null)
+        vaChamHopDan = GetComponent<Collider>();
+        if (vaChamHopDan != null)
         {
-            vaCham.isTrigger = true;
+            vaChamHopDan.isTrigger = true;
         }
 
-        // Dam bao Rigidbody khong bi kinematic de hop dan roi dung trong luc tren moi may
-        Rigidbody vatLy = GetComponent<Rigidbody>();
-        if (vatLy != null)
+        vatLyHopDan = GetComponent<Rigidbody>();
+        if (vatLyHopDan != null)
         {
-            vatLy.isKinematic = false;
+            vatLyHopDan.isKinematic = false;
+        }
+
+        if (hanhDongNhatPhimE == null)
+        {
+            hanhDongNhatTamThoi = new InputAction("PickupAmmoBox", InputActionType.Button, "<Keyboard>/e");
+        }
+    }
+
+    private void OnEnable()
+    {
+        HanhDongNhatDangDung?.Enable();
+    }
+
+    private void OnDisable()
+    {
+        HanhDongNhatDangDung?.Disable();
+    }
+
+    private void OnDestroy()
+    {
+        hanhDongNhatTamThoi?.Dispose();
+    }
+
+    private void Update()
+    {
+        if (!nhatBangPhimE || soLuongDanCongThem <= 0) return;
+
+        InputAction action = HanhDongNhatDangDung;
+        if (action == null || !action.WasPressedThisFrame()) return;
+
+        DamBaoCacheNguoiChoi();
+        if (cachedPlayerRoot == null) return;
+
+        Transform diemDo = Camera.main != null ? Camera.main.transform : cachedPlayerRoot;
+        float khoangCach = Vector3.Distance(diemDo.position, transform.position);
+        if (khoangCach > khoangCachNhatPhimE) return;
+
+        if (CongDanTheoLoai(cachedPlayerRoot, cachedWeaponSwitcher))
+        {
+            Destroy(gameObject);
         }
     }
 
     private void OnTriggerEnter(Collider other)
     {
-        if (other == null || soLuongDanCongThem <= 0) return;
+        if (nhatBangPhimE || other == null || soLuongDanCongThem <= 0) return;
 
         Transform gocNguoiChoi = TimGocNguoiChoi(other);
         if (gocNguoiChoi == null) return;
 
-        bool daCongDan = CongDanTheoLoai(gocNguoiChoi);
-        if (daCongDan)
+        WeaponSwitcher boChuyen = gocNguoiChoi.GetComponentInChildren<WeaponSwitcher>(true);
+        if (CongDanTheoLoai(gocNguoiChoi, boChuyen))
         {
             Destroy(gameObject);
+        }
+    }
+
+    private void DamBaoCacheNguoiChoi()
+    {
+        if (cachedPlayerRoot != null && cachedWeaponSwitcher != null) return;
+
+        if (cachedWeaponSwitcher == null)
+        {
+            cachedWeaponSwitcher = FindFirstObjectByType<WeaponSwitcher>();
+        }
+
+        if (cachedPlayerRoot == null)
+        {
+            if (cachedWeaponSwitcher != null)
+            {
+                cachedPlayerRoot = cachedWeaponSwitcher.transform.root;
+            }
+            else if (Camera.main != null)
+            {
+                cachedPlayerRoot = Camera.main.transform.root;
+            }
         }
     }
 
@@ -79,8 +159,7 @@ public class AmmoBox : MonoBehaviour
         if (vaCham.GetComponentInParent<CharacterController>() != null ||
             vaCham.GetComponentInChildren<CharacterController>(true) != null ||
             vaCham.GetComponentInParent<WeaponSystem>() != null ||
-            vaCham.GetComponentInParent<SniperWeapon>() != null ||
-            vaCham.GetComponentInParent<GrenadeWeapon>() != null)
+            vaCham.GetComponentInParent<SniperWeapon>() != null)
         {
             return vaCham.transform.root;
         }
@@ -88,10 +167,13 @@ public class AmmoBox : MonoBehaviour
         return null;
     }
 
-    // Cong dan dung theo dropdown loaiDan da chon
-    private bool CongDanTheoLoai(Transform gocNguoiChoi)
+    // Cong dan dung theo dropdown loaiDan da chon (khong cong luu dan)
+    private bool CongDanTheoLoai(Transform gocNguoiChoi, WeaponSwitcher boChuyen)
     {
-        WeaponSwitcher boChuyen = gocNguoiChoi.GetComponentInChildren<WeaponSwitcher>(true);
+        if (boChuyen == null && gocNguoiChoi != null)
+        {
+            boChuyen = gocNguoiChoi.GetComponentInChildren<WeaponSwitcher>(true);
+        }
 
         switch (loaiDan)
         {
@@ -100,9 +182,6 @@ public class AmmoBox : MonoBehaviour
 
             case LoaiDanHopDan.DanSungTia:
                 return CongDanSungTia(gocNguoiChoi, boChuyen);
-
-            case LoaiDanHopDan.DanLuuDan:
-                return CongDanLuuDan(gocNguoiChoi, boChuyen);
 
             case LoaiDanHopDan.TuDongTheoVuKhiDangCam:
             default:
@@ -118,7 +197,7 @@ public class AmmoBox : MonoBehaviour
             return true;
         }
 
-        WeaponSystem sungThuong = gocNguoiChoi.GetComponentInChildren<WeaponSystem>(true);
+        WeaponSystem sungThuong = gocNguoiChoi != null ? gocNguoiChoi.GetComponentInChildren<WeaponSystem>(true) : null;
         if (sungThuong != null)
         {
             sungThuong.AddReserveAmmo(soLuongDanCongThem);
@@ -136,7 +215,7 @@ public class AmmoBox : MonoBehaviour
             return true;
         }
 
-        SniperWeapon sungTia = gocNguoiChoi.GetComponentInChildren<SniperWeapon>(true);
+        SniperWeapon sungTia = gocNguoiChoi != null ? gocNguoiChoi.GetComponentInChildren<SniperWeapon>(true) : null;
         if (sungTia != null)
         {
             sungTia.AddReserveAmmo(soLuongDanCongThem);
@@ -144,41 +223,6 @@ public class AmmoBox : MonoBehaviour
         }
 
         return false;
-    }
-
-    private bool CongDanLuuDan(Transform gocNguoiChoi, WeaponSwitcher boChuyen)
-    {
-        GrenadeWeapon luuDan = null;
-
-        if (boChuyen != null)
-        {
-            luuDan = boChuyen.CurrentGrenadeWeapon ?? boChuyen.EquippedGrenadeSlot;
-        }
-
-        if (luuDan == null)
-        {
-            luuDan = gocNguoiChoi.GetComponentInChildren<GrenadeWeapon>(true);
-        }
-
-        if (luuDan == null) return false;
-
-        luuDan.AddGrenades(soLuongDanCongThem);
-
-        // Chi cho phep hien thi neu nguoi choi dang chon dung slot luu dan
-        bool dangChonLuuDan = boChuyen != null &&
-                              (boChuyen.CurrentGrenadeWeapon == luuDan ||
-                               boChuyen.CurrentWeaponIndex == (int)WeaponCategory.Grenade);
-
-        if (luuDan.ConLuuDan && dangChonLuuDan)
-        {
-            luuDan.gameObject.SetActive(true);
-        }
-        else
-        {
-            luuDan.gameObject.SetActive(false);
-        }
-
-        return true;
     }
 
     private bool CongDanTuDongTheoVuKhiDangCam(Transform gocNguoiChoi, WeaponSwitcher boChuyen)
@@ -196,40 +240,19 @@ public class AmmoBox : MonoBehaviour
                 boChuyen.CurrentWeaponSystem.AddReserveAmmo(soLuongDanCongThem);
                 return true;
             }
-
-            if (boChuyen.CurrentGrenadeWeapon != null)
-            {
-                boChuyen.CurrentGrenadeWeapon.AddGrenades(soLuongDanCongThem);
-                if (boChuyen.CurrentGrenadeWeapon.ConLuuDan)
-                {
-                    boChuyen.CurrentGrenadeWeapon.gameObject.SetActive(true);
-                }
-                return true;
-            }
         }
 
-        SniperWeapon sungTia = gocNguoiChoi.GetComponentInChildren<SniperWeapon>(true);
+        SniperWeapon sungTia = gocNguoiChoi != null ? gocNguoiChoi.GetComponentInChildren<SniperWeapon>(true) : null;
         if (sungTia != null)
         {
             sungTia.AddReserveAmmo(soLuongDanCongThem);
             return true;
         }
 
-        WeaponSystem sungThuong = gocNguoiChoi.GetComponentInChildren<WeaponSystem>(true);
+        WeaponSystem sungThuong = gocNguoiChoi != null ? gocNguoiChoi.GetComponentInChildren<WeaponSystem>(true) : null;
         if (sungThuong != null)
         {
             sungThuong.AddReserveAmmo(soLuongDanCongThem);
-            return true;
-        }
-
-        GrenadeWeapon luuDan = gocNguoiChoi.GetComponentInChildren<GrenadeWeapon>(true);
-        if (luuDan != null)
-        {
-            luuDan.AddGrenades(soLuongDanCongThem);
-            bool dangChonLuuDan = boChuyen != null &&
-                                  (boChuyen.CurrentGrenadeWeapon == luuDan ||
-                                   boChuyen.CurrentWeaponIndex == (int)WeaponCategory.Grenade);
-            luuDan.gameObject.SetActive(luuDan.ConLuuDan && dangChonLuuDan);
             return true;
         }
 

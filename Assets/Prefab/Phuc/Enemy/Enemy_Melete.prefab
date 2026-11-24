@@ -609,9 +609,14 @@ MonoBehaviour:
     serializedVersion: 2
     m_Bits: 1024
   tagVatCan: Wall
-  doDaiKiemTraTuong: 2
+  doDaiKiemTraTuong: 3
   banKinhTamNhin: 50
   gocNhin: 110
+  gocNhinTren: 35
+  gocNhinDuoi: 35
+  heSoTangBanKinhTruyDuoi: 1.5
+  heSoTangGocTruyDuoi: 1.4
+  heSoTangGocDocTruyDuoi: 1.35
   diemDatMat: {fileID: 7537687112345173390}
   thoiGianNhoDau: 3
   khoangCachVongTuong: 4.5
@@ -758,19 +763,31 @@ MonoBehaviour:
   loaiDoiTuong: 1
   mauToiDa: 100
   giapPhongThu: 0
+  dungGiapNangLuong: 1
+  giapToiDa: 100
+  giapKhoiDau: -1
+  tiLeMauMatToiDaKhiCoGiap: 0.1
+  nguongDamageDatTranGiap: 50
+  heSoTieuHaoGiap: 1
   thoiGianBatTuSauTrungDon: 0
   tuDongHoiMau: 0
   thoiGianChoHoiMau: 5
   tocDoHoiMau: 10
   thanhMauSlider: {fileID: 6044433449260448870}
+  thanhGiapSlider: {fileID: 0}
   anThanhMauKhiDay: 1
   nguonAmThanh: {fileID: 7443385535856711110}
   amThanhTrungDon: {fileID: 0}
+  amThanhGiapChan: {fileID: 0}
+  amThanhHoiGiap: {fileID: 0}
   amThanhChet: {fileID: 0}
   amLuong: 0.9
   hieuUngKhiChet: {fileID: 0}
   thoiGianHuyKhiChet: 0.15
   onMauThayDoi:
+    m_PersistentCalls:
+      m_Calls: []
+  onGiapThayDoi:
     m_PersistentCalls:
       m_Calls: []
   onTrungDon:

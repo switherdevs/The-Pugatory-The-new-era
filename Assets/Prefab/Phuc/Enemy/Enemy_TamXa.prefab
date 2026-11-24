@@ -974,11 +974,14 @@ MonoBehaviour:
     serializedVersion: 2
     m_Bits: 1024
   tagVatCan: Wall
-  doDaiKiemTraTuong: 2
+  doDaiKiemTraTuong: 3
   banKinhTamNhin: 50
   gocNhin: 120
+  gocNhinTren: 35
+  gocNhinDuoi: 35
   heSoTangBanKinhTruyDuoi: 1.5
   heSoTangGocTruyDuoi: 1.4
+  heSoTangGocDocTruyDuoi: 1.35
   diemDatMat: {fileID: 255309652028663356}
   thoiGianNhoDau: 3
   khoangCachVongTuong: 4.5

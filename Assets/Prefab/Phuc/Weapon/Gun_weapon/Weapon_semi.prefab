@@ -138,6 +138,7 @@ MonoBehaviour:
   reloadTime: 1.25
   recoilUp: 1.5
   recoilSide: 0.1
+  aimRecoilMultiplier: 0.5
   spreadForce: 5
   bulletPrefab: {fileID: 1788540390887508892, guid: c2d574f4417a1f2408b0e1175842d027, type: 3}
   firePoint: {fileID: 341464434177021086}
@@ -288,10 +289,15 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::WeaponClassifier
   category: 1
   autoDetectIfUnset: 1
-  autoSetDefaultLayerWhenUnheld: 1
+  requirePickupRadius: 1
+  pickupRadius: 3
+  useHorizontalDistanceXZ: 0
+  pickupAnchorOverride: {fileID: 0}
+  drawPickupGizmo: 1
+  autoSwitchLayerOnEquipDrop: 1
   applyToChildren: 1
   weaponLayerIndex: 8
-  heldLayerIndex: 0
+  unheldLayerIndex: 0
 --- !u!1 &8015373720642462189
 GameObject:
   m_ObjectHideFlags: 0

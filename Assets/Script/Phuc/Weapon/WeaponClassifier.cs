@@ -6,15 +6,15 @@ using UnityEditor;
 
 public enum WeaponCategory
 {
-    PrimaryWeapon = 0,   // Index 0: Vũ khí chính
-    SecondaryWeapon = 1, // Index 1: Vũ khí phụ
-    MeleeWeapon = 2,     // Index 2: Cận chiến
-    Grenade = 3,         // Index 3: Lựu đạn
-    SupportGear = 4      // Index 4: Thiết bị hỗ trợ
+    PrimaryWeapon = 0,   // Index 0: Vu khi chinh
+    SecondaryWeapon = 1, // Index 1: Vu khi phu
+    MeleeWeapon = 2,     // Index 2: Can chien
+    Grenade = 3,         // Index 3: Luu dan / Flashbang
+    SupportGear = 4      // Index 4: Thiet bi ho tro
 }
 
 /// <summary>
-/// Thuộc tính hiển thị Dropdown danh sách Layer có sẵn trong Unity (-1 = Giữ layer gốc / Tự tìm).
+/// Thuoc tinh hien thi Dropdown danh sach Layer co san trong Unity (-1 = Giu layer goc / Tu tim).
 /// </summary>
 public class SingleLayerDropdownAttribute : PropertyAttribute
 {
@@ -47,7 +47,7 @@ public class SingleLayerDropdownDrawer : PropertyDrawer
         if (attr.AllowKeepOriginal)
         {
             options = new string[33];
-            options[0] = "Giữ Layer Gốc / Tự Tìm";
+            options[0] = "Giu Layer Goc / Tu Tim";
             for (int i = 0; i < 32; i++)
             {
                 options[i + 1] = projectLayers[i];
@@ -80,25 +80,42 @@ public class SingleLayerDropdownDrawer : PropertyDrawer
 
 public class WeaponClassifier : MonoBehaviour
 {
-    [Header("Phân Loại Vũ Khí (5 Nhóm = Index 0..4)")]
-    [Tooltip("Chọn loại của vũ khí này: 0 Vũ khí chính, 1 Vũ khí phụ, 2 Cận chiến, 3 Lựu đạn, 4 Thiết bị hỗ trợ.")]
+    [Header("Phan Loai Vu Khi (5 Nhom = Index 0..4)")]
+    [Tooltip("Chon loai cua vu khi nay: 0 Vu khi chinh, 1 Vu khi phu, 2 Can chien, 3 Luu dan/Flashbang, 4 Thiet bi ho tro.")]
     [SerializeField] private WeaponCategory category = WeaponCategory.PrimaryWeapon;
 
-    [Tooltip("Nếu bật, script sẽ tự đoán loại vũ khí dựa trên component/tên khi chưa tự chọn.")]
+    [Tooltip("Neu bat, script se tu doan loai vu khi dua tren component/ten khi chua tu chon.")]
     [SerializeField] private bool autoDetectIfUnset = true;
 
-    [Header("Tự Động Đổi Layer Khi Nhặt / Vứt Vũ Khí")]
-    [Tooltip("Bật/tắt tự động đổi layer theo trạng thái được Player cầm hay nằm ngoài.")]
+    [Header("Ban Kinh Nhat Vu Khi (Pickup Radius)")]
+    [Tooltip("Bat/tat bat buoc phai nam trong ban kinh moi duoc phep nhat vu khi.")]
+    [SerializeField] private bool requirePickupRadius = true;
+
+    [Tooltip("Ban kinh nhat vu khi (don vi met). Phai gan trong khoang nay moi nhat duoc.")]
+    [Min(0.1f)]
+    [SerializeField] private float pickupRadius = 2.5f;
+
+    [Tooltip("Neu bat, chi tinh khoang cach theo mat phang XZ (tranh lech do cao pivot Player/vu khi).")]
+    [SerializeField] private bool useHorizontalDistanceXZ = false;
+
+    [Tooltip("Diem tam tuy chon de do ban kinh nhat (neu de trong se dung vi tri vu khi hien tai).")]
+    [SerializeField] private Transform pickupAnchorOverride;
+
+    [Tooltip("Hien thi vong ban kinh nhat vu khi trong Scene view khi chon object.")]
+    [SerializeField] private bool drawPickupGizmo = true;
+
+    [Header("Tu Dong Doi Layer Khi Nhat / Vut Vu Khi")]
+    [Tooltip("Bat/tat tu dong doi layer theo trang thai duoc Player cam hay nam ngoai.")]
     [SerializeField] private bool autoSwitchLayerOnEquipDrop = true;
 
-    [Tooltip("Áp dụng đổi layer cho cả các GameObject con bên trong vũ khí.")]
+    [Tooltip("Ap dung doi layer cho ca cac GameObject con ben trong vu khi.")]
     [SerializeField] private bool applyToChildren = true;
 
-    [Tooltip("Dropdown chọn Layer vũ khí khi được Player cầm / nhặt lên (mặc định tự tìm layer 'Weapon' nếu chọn 'Giữ Layer Gốc / Tự Tìm').")]
+    [Tooltip("Dropdown chon Layer vu khi khi duoc Player cam / nhat len (mac dinh tu tim layer 'Weapon' neu chon 'Giu Layer Goc / Tu Tim').")]
     [SingleLayerDropdown(allowKeepOriginal: true)]
     [SerializeField] private int weaponLayerIndex = -1;
 
-    [Tooltip("Dropdown chọn Layer khi vũ khí KHÔNG được Player cầm / bị vứt ra (mặc định là Default = 0).")]
+    [Tooltip("Dropdown chon Layer khi vu khi KHONG duoc Player cam / bi vut ra (mac dinh la Default = 0).")]
     [SingleLayerDropdown(allowKeepOriginal: false)]
     [SerializeField] private int unheldLayerIndex = 0;
 
@@ -108,17 +125,26 @@ public class WeaponClassifier : MonoBehaviour
     private bool hasCachedInitialLayer = false;
     private bool lastHeldState = false;
     private bool hasEvaluatedHeldState = false;
+    private Transform[] cachedChildTransforms;
 
     public WeaponCategory Category => category;
 
-    // Trả về đúng index tương ứng (0..4) để WeaponSwitcher nhận diện
+    // Tra ve dung index tuong ung (0..4) de WeaponSwitcher nhan dien
     public int SlotIndex => (int)category;
 
     public bool IsHeldByPlayer => CheckIsHeldByPlayer();
 
+    public bool RequirePickupRadius => requirePickupRadius;
+
+    public float PickupRadius => Mathf.Max(0.1f, pickupRadius);
+
+    private Vector3 PickupWorldOrigin => pickupAnchorOverride != null ? pickupAnchorOverride.position : transform.position;
+
     private void OnValidate()
     {
         hasManualCategory = true;
+        pickupRadius = Mathf.Max(0.1f, pickupRadius);
+
         defaultLayerIndex = LayerMask.NameToLayer("Default");
         if (defaultLayerIndex < 0) defaultLayerIndex = 0;
         if (unheldLayerIndex < 0 || unheldLayerIndex >= 32) unheldLayerIndex = defaultLayerIndex;
@@ -126,6 +152,8 @@ public class WeaponClassifier : MonoBehaviour
 
     private void Awake()
     {
+        pickupRadius = Mathf.Max(0.1f, pickupRadius);
+
         defaultLayerIndex = LayerMask.NameToLayer("Default");
         if (defaultLayerIndex < 0) defaultLayerIndex = 0;
         if (unheldLayerIndex < 0 || unheldLayerIndex >= 32) unheldLayerIndex = defaultLayerIndex;
@@ -134,6 +162,11 @@ public class WeaponClassifier : MonoBehaviour
         {
             cachedInitialLayerIndex = gameObject.layer;
             hasCachedInitialLayer = true;
+        }
+
+        if (applyToChildren && cachedChildTransforms == null)
+        {
+            cachedChildTransforms = GetComponentsInChildren<Transform>(true);
         }
 
         if (autoDetectIfUnset && !hasManualCategory)
@@ -156,13 +189,176 @@ public class WeaponClassifier : MonoBehaviour
 
     private void OnTransformParentChanged()
     {
-        // Nhận diện ngay khi Player nhặt vũ khí vào tay hoặc vừa vứt vũ khí ra khỏi tay
+        // Nhan dien ngay khi Player nhat vu khi vao tay hoac vua vut vu khi ra khoi tay
+        if (applyToChildren)
+        {
+            cachedChildTransforms = GetComponentsInChildren<Transform>(true);
+        }
         EvaluateAndApplyLayerState(forceApply: true);
     }
 
     private void Update()
     {
         EvaluateAndApplyLayerState(forceApply: false);
+    }
+
+    /// <summary>
+    /// Tinh khoang cach tu diem nhap vu khi den mot vi tri / Transform cua Player.
+    /// </summary>
+    public float GetDistanceTo(Vector3 worldPoint)
+    {
+        Vector3 origin = PickupWorldOrigin;
+
+        if (useHorizontalDistanceXZ)
+        {
+            origin.y = 0f;
+            worldPoint.y = 0f;
+        }
+
+        return Vector3.Distance(origin, worldPoint);
+    }
+
+    /// <summary>
+    /// Kiem tra xem mot diem / Player co nam trong ban kinh nhap vu khi hay khong.
+    /// Dung sqrMagnitude de toi uu hieu nang khi kiem tra thuong xuyen.
+    /// </summary>
+    public bool IsWithinPickupRadius(Vector3 worldPoint)
+    {
+        if (!requirePickupRadius) return true;
+
+        float radius = Mathf.Max(0.1f, pickupRadius);
+        Vector3 origin = PickupWorldOrigin;
+
+        if (useHorizontalDistanceXZ)
+        {
+            origin.y = 0f;
+            worldPoint.y = 0f;
+        }
+
+        float sqrDist = (origin - worldPoint).sqrMagnitude;
+        return sqrDist <= radius * radius;
+    }
+
+    /// <summary>
+    /// Kiem tra xem Player (truyen Transform hoac tu dong tim neu null) co du dieu kien nhat vu khi nay khong.
+    /// Tra ve true neu: object dang active/enabled, chua bi cam boi Player, va nam trong ban kinh nhap (neu bat).
+    /// </summary>
+    public bool CanBePickedUp(Transform pickerTransform = null)
+    {
+        if (!isActiveAndEnabled) return false;
+
+        // Vu khi dang duoc cam tren tay thi khong coi la vat pham cho nhat duoi dat
+        if (CheckIsHeldByPlayer()) return false;
+
+        if (!requirePickupRadius) return true;
+
+        Transform resolvedPicker = ResolvePickerTransform(pickerTransform);
+        if (resolvedPicker == null)
+        {
+            // Khong tim thay Player hop le thi chan nhat de tranh nhat tu xa ngoai tam kiem soat
+            return false;
+        }
+
+        return IsWithinPickupRadius(resolvedPicker.position);
+    }
+
+    /// <summary>
+    /// Ham tien ich cho he thong nhat do / WeaponSwitcher: chi cho phep nhat khi du dieu kien ban kinh.
+    /// </summary>
+    public bool TryValidatePickup(Transform pickerTransform, out float currentDistance)
+    {
+        currentDistance = float.MaxValue;
+
+        if (!isActiveAndEnabled || CheckIsHeldByPlayer())
+        {
+            return false;
+        }
+
+        Transform resolvedPicker = ResolvePickerTransform(pickerTransform);
+        if (resolvedPicker != null)
+        {
+            currentDistance = GetDistanceTo(resolvedPicker.position);
+        }
+
+        if (!requirePickupRadius)
+        {
+            return true;
+        }
+
+        if (resolvedPicker == null)
+        {
+            return false;
+        }
+
+        return IsWithinPickupRadius(resolvedPicker.position);
+    }
+
+    /// <summary>
+    /// Ham tinh kiem tra nhanh xem mot GameObject vu khi co the duoc nhat boi picker hay khong.
+    /// </summary>
+    public static bool CanPickUpWeapon(GameObject weaponObj, Transform pickerTransform = null)
+    {
+        if (weaponObj == null || !weaponObj.activeInHierarchy) return false;
+
+        WeaponClassifier classifier = weaponObj.GetComponent<WeaponClassifier>();
+        if (classifier == null)
+        {
+            classifier = weaponObj.GetComponentInChildren<WeaponClassifier>(true);
+        }
+
+        if (classifier != null)
+        {
+            return classifier.CanBePickedUp(pickerTransform);
+        }
+
+        // Fallback neu vu khi chua gan WeaponClassifier: kiem tra khoang cach mac dinh 2.5m neu co picker
+        Transform resolvedPicker = pickerTransform;
+        if (resolvedPicker == null)
+        {
+            WeaponSwitcher switcher = Object.FindFirstObjectByType<WeaponSwitcher>();
+            if (switcher != null) resolvedPicker = switcher.transform;
+        }
+
+        if (resolvedPicker == null && Camera.main != null)
+        {
+            resolvedPicker = Camera.main.transform;
+        }
+
+        if (resolvedPicker == null) return false;
+
+        const float fallbackRadius = 2.5f;
+        float sqrDist = (weaponObj.transform.position - resolvedPicker.position).sqrMagnitude;
+        return sqrDist <= fallbackRadius * fallbackRadius;
+    }
+
+    /// <summary>
+    /// Tu tim Transform cua Player neu he thong goi khong truyen vao.
+    /// </summary>
+    private Transform ResolvePickerTransform(Transform explicitPicker)
+    {
+        if (explicitPicker != null)
+        {
+            return explicitPicker;
+        }
+
+        WeaponSwitcher switcher = Object.FindFirstObjectByType<WeaponSwitcher>();
+        if (switcher != null)
+        {
+            return switcher.transform;
+        }
+
+        CharacterController cc = Object.FindFirstObjectByType<CharacterController>();
+        if (cc != null)
+        {
+            return cc.transform;
+        }
+
+        if (Camera.main != null)
+        {
+            return Camera.main.transform;
+        }
+
+        return null;
     }
 
     private int ResolveWeaponHeldLayer()
@@ -187,8 +383,8 @@ public class WeaponClassifier : MonoBehaviour
     }
 
     /// <summary>
-    /// Kiểm tra vũ khí hiện có đang được Player cầm hay không
-    /// (có cha thuộc Player có CharacterController hoặc WeaponSwitcher).
+    /// Kiem tra vu khi hien co dang duoc Player cam hay khong
+    /// (co cha thuoc Player co CharacterController hoac WeaponSwitcher).
     /// </summary>
     public bool CheckIsHeldByPlayer()
     {
@@ -200,9 +396,7 @@ public class WeaponClassifier : MonoBehaviour
     }
 
     /// <summary>
-    /// Nhận diện trạng thái cầm/không cầm:
-    /// - Khi được Player cầm / nhặt lên: đổi về Layer vũ khí (Weapon Layer Index / 'Weapon').
-    /// - Khi không được Player cầm / bị vứt: chuyển thành Unheld Layer Index (mặc định Default).
+    /// Nhan dien trang thai cam/khong cam va dong bo layer hieu qua.
     /// </summary>
     public void EvaluateAndApplyLayerState(bool forceApply = false)
     {
@@ -225,7 +419,7 @@ public class WeaponClassifier : MonoBehaviour
     }
 
     /// <summary>
-    /// Hàm tĩnh ép cập nhật layer ngay cho vũ khí khi vừa nhặt hoặc vừa vứt.
+    /// Ham tinh ep cap nhat layer ngay cho vu khi khi vua nhat hoac vua vut.
     /// </summary>
     public static void RefreshWeaponLayer(GameObject weaponObj)
     {
@@ -253,16 +447,23 @@ public class WeaponClassifier : MonoBehaviour
             return;
         }
 
-        Transform[] transforms = target.GetComponentsInChildren<Transform>(true);
-        for (int i = 0; i < transforms.Length; i++)
+        if (cachedChildTransforms == null || cachedChildTransforms.Length == 0)
         {
-            transforms[i].gameObject.layer = layer;
+            cachedChildTransforms = target.GetComponentsInChildren<Transform>(true);
+        }
+
+        for (int i = 0; i < cachedChildTransforms.Length; i++)
+        {
+            Transform t = cachedChildTransforms[i];
+            if (t != null)
+            {
+                t.gameObject.layer = layer;
+            }
         }
     }
 
     /// <summary>
-    /// Hàm tĩnh giúp WeaponSwitcher nhận diện loại vũ khí của bất kỳ GameObject nào
-    /// (ưu tiên lấy từ WeaponClassifier nếu có, nếu không sẽ tự nhận diện).
+    /// Ham tinh giup WeaponSwitcher nhan dien loai vu khi cua bat ky GameObject nao.
     /// </summary>
     public static WeaponCategory GetWeaponCategory(GameObject weaponObj)
     {
@@ -283,7 +484,7 @@ public class WeaponClassifier : MonoBehaviour
     }
 
     /// <summary>
-    /// Trả về index (0..4) tương ứng của vũ khí để WeaponSwitcher sắp xếp & kiểm tra trùng loại.
+    /// Tra ve index (0..4) tuong ung cua vu khi de WeaponSwitcher sap xep & kiem tra trung loai.
     /// </summary>
     public static int GetWeaponSlotIndex(GameObject weaponObj)
     {
@@ -299,7 +500,12 @@ public class WeaponClassifier : MonoBehaviour
     {
         if (obj == null) return WeaponCategory.PrimaryWeapon;
 
-        string lower = obj.name.ToLower();
+        if (obj.GetComponentInChildren<GrenadeWeapon>(true) != null)
+        {
+            return WeaponCategory.Grenade;
+        }
+
+        string lower = obj.name.ToLowerInvariant();
 
         if (obj.GetComponentInChildren<MeleeWeapon>(true) != null ||
             lower.Contains("melee") || lower.Contains("knife") || lower.Contains("sword"))
@@ -307,7 +513,8 @@ public class WeaponClassifier : MonoBehaviour
             return WeaponCategory.MeleeWeapon;
         }
 
-        if (lower.Contains("grenade") || lower.Contains("luu_dan") || lower.Contains("lựu đạn"))
+        if (lower.Contains("grenade") || lower.Contains("flash") || lower.Contains("flashbang") ||
+            lower.Contains("luu_dan") || lower.Contains("lựu đạn"))
         {
             return WeaponCategory.Grenade;
         }
@@ -325,4 +532,22 @@ public class WeaponClassifier : MonoBehaviour
 
         return WeaponCategory.PrimaryWeapon;
     }
+
+#if UNITY_EDITOR
+    private void OnDrawGizmosSelected()
+    {
+        if (!drawPickupGizmo || !requirePickupRadius) return;
+
+        Vector3 center = PickupWorldOrigin;
+        float radius = Mathf.Max(0.1f, pickupRadius);
+        Transform picker = ResolvePickerTransform(null);
+        bool inRange = picker != null && IsWithinPickupRadius(picker.position);
+
+        Handles.color = inRange ? new Color(0.15f, 0.9f, 0.35f, 0.9f) : new Color(0.2f, 0.75f, 1f, 0.85f);
+        Handles.DrawWireDisc(center, Vector3.up, radius);
+
+        Gizmos.color = inRange ? new Color(0.15f, 0.9f, 0.35f, 0.14f) : new Color(0.2f, 0.75f, 1f, 0.1f);
+        Gizmos.DrawSphere(center, radius);
+    }
+#endif
 }

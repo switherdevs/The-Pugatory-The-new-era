@@ -351,6 +351,11 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::WeaponLoadoutClassifier
   category: 0
   autoDetectIfUnset: 1
+  requirePickupRadius: 1
+  pickupRadius: 3
+  useHorizontalDistanceXZ: 0
+  pickupAnchorOverride: {fileID: 0}
+  drawPickupGizmo: 1
   autoSwitchLayerOnEquipDrop: 1
   applyToChildren: 1
   weaponLayerIndex: 8

@@ -215,6 +215,26 @@
                     "interactions": "",
                     "initialStateCheck": false,
                     "priority": 0
+                },
+                {
+                    "name": "CheMat",
+                    "type": "Button",
+                    "id": "682a54b6-4e84-4452-9954-3ca5f1d90e62",
+                    "expectedControlType": "",
+                    "processors": "",
+                    "interactions": "",
+                    "initialStateCheck": false,
+                    "priority": 0
+                },
+                {
+                    "name": "FlashLight",
+                    "type": "Button",
+                    "id": "34ad835e-cd84-4e1f-ac17-8b1236863188",
+                    "expectedControlType": "",
+                    "processors": "",
+                    "interactions": "",
+                    "initialStateCheck": false,
+                    "priority": 0
                 }
             ],
             "bindings": [
@@ -732,6 +752,28 @@
                     "processors": "",
                     "groups": "",
                     "action": "lean right",
+                    "isComposite": false,
+                    "isPartOfComposite": false
+                },
+                {
+                    "name": "",
+                    "id": "76db8c53-12ea-4e0e-a59c-e92fea1a7bb8",
+                    "path": "<Keyboard>/b",
+                    "interactions": "",
+                    "processors": "",
+                    "groups": "",
+                    "action": "CheMat",
+                    "isComposite": false,
+                    "isPartOfComposite": false
+                },
+                {
+                    "name": "",
+                    "id": "99e75db0-7c30-4b24-b059-c4a868590b1f",
+                    "path": "<Keyboard>/f",
+                    "interactions": "",
+                    "processors": "",
+                    "groups": "",
+                    "action": "FlashLight",
                     "isComposite": false,
                     "isPartOfComposite": false
                 }

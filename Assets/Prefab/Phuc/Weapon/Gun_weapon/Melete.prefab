@@ -297,10 +297,15 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::WeaponLoadoutClassifier
   category: 2
   autoDetectIfUnset: 1
-  autoSetDefaultLayerWhenUnheld: 1
+  requirePickupRadius: 1
+  pickupRadius: 3
+  useHorizontalDistanceXZ: 0
+  pickupAnchorOverride: {fileID: 0}
+  drawPickupGizmo: 1
+  autoSwitchLayerOnEquipDrop: 1
   applyToChildren: 1
   weaponLayerIndex: 8
-  heldLayerIndex: 0
+  unheldLayerIndex: 0
 --- !u!1 &3367455002521897921
 GameObject:
   m_ObjectHideFlags: 0

@@ -178,11 +178,14 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::DamageDealer
   pheGaySatThuong: 0
-  satThuong: 15
+  satThuong: 35
   huySauKhiVaCham: 0
   thoiGianTonTaiToiDa: 5
   thoiGianHoiSatThuongLienTuc: 0.5
   hieuUngVaCham: {fileID: 0}
+  gaySatThuongQuaCollision: 1
+  gaySatThuongQuaTrigger: 1
+  gaySatThuongKhiDangCham: 1
 --- !u!1 &2322612796663411877
 GameObject:
   m_ObjectHideFlags: 0
