@@ -262,6 +262,21 @@ public class GrenadeWeapon : MonoBehaviour
         }
     }
 
+    private static void DatLayerVeDefault(GameObject target)
+    {
+        if (target == null) return;
+
+        target.layer = 0;
+        Transform[] allTransforms = target.GetComponentsInChildren<Transform>(true);
+        for (int i = 0; i < allTransforms.Length; i++)
+        {
+            if (allTransforms[i] != null)
+            {
+                allTransforms[i].gameObject.layer = 0;
+            }
+        }
+    }
+
     public bool DaDuocNhatVaCamTrenTay()
     {
         if (!gameObject.activeInHierarchy || !enabled) return false;
@@ -374,6 +389,8 @@ public class GrenadeWeapon : MonoBehaviour
             }
         }
 
+        // Reset ve layer Default (0) truoc khi RefreshWeaponLayer de khong con mang layer khi cam tren tay
+        DatLayerVeDefault(dropObj);
         WeaponClassifier.RefreshWeaponLayer(dropObj);
     }
 

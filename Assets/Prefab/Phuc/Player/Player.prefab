@@ -694,12 +694,12 @@ GameObject:
   - component: {fileID: 5464887421486324670}
   - component: {fileID: 1676835665823517505}
   - component: {fileID: 7635016357681987304}
-  - component: {fileID: 2213084137778160658}
   - component: {fileID: 4864456756849798777}
   - component: {fileID: 6345309465837024934}
   - component: {fileID: 7584451691916554637}
   - component: {fileID: 7715651511247060650}
   - component: {fileID: 190011083210766913}
+  - component: {fileID: 838388880556391756}
   m_Layer: 10
   m_Name: Player
   m_TagString: Player
@@ -849,6 +849,9 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::IronStormMovement
   normalSpeed: 10
   runSpeed: 20
+  movementSmoothTime: 0.08
+  groundStopDamping: 14
+  airControlFactor: 0.75
   jumpHeight: 2
   gravity: -30
   dashSpeed: 100
@@ -858,7 +861,7 @@ MonoBehaviour:
   allowJumpPackDash: 1
   airDashVerticalCarry: 0.25
   defaultHeight: 2
-  crouchHeight: 1
+  crouchHeight: 1.25
   crouchTransitionSpeed: 10
   footstepAudioSource: {fileID: 1676835665823517505}
   footstepClip: {fileID: 8300000, guid: ace7742998c126b44af47bd1daee6e83, type: 3}
@@ -884,7 +887,7 @@ AudioSource:
   m_audioClip: {fileID: 0}
   m_Resource: {fileID: 8300000, guid: ace7742998c126b44af47bd1daee6e83, type: 3}
   m_PlayOnAwake: 0
-  m_Volume: 0.5
+  m_Volume: 0.35
   m_Pitch: 1
   Loop: 0
   Mute: 0
@@ -1006,33 +1009,6 @@ MonoBehaviour:
   equipOffsetY: -1
   equipOffsetZ: -60
   equipDuration: 0.17
---- !u!54 &2213084137778160658
-Rigidbody:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 5361435603796722228}
-  serializedVersion: 5
-  m_Mass: 1
-  m_LinearDamping: 0
-  m_AngularDamping: 0.05
-  m_CenterOfMass: {x: 0, y: 0, z: 0}
-  m_InertiaTensor: {x: 1, y: 1, z: 1}
-  m_InertiaRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_IncludeLayers:
-    serializedVersion: 2
-    m_Bits: 0
-  m_ExcludeLayers:
-    serializedVersion: 2
-    m_Bits: 0
-  m_ImplicitCom: 1
-  m_ImplicitTensor: 1
-  m_UseGravity: 1
-  m_IsKinematic: 0
-  m_Interpolate: 0
-  m_Constraints: 112
-  m_CollisionDetection: 0
 --- !u!114 &4864456756849798777
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -1209,6 +1185,52 @@ MonoBehaviour:
   hanhDongNhamMat: {fileID: 4231383913437811008, guid: 052faaac586de48259a63d0c4782560b, type: 3}
   doAlphaKhiNhamMat: 0.92
   tocDoChuyenAlpha: 14
+--- !u!114 &838388880556391756
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 5361435603796722228}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 5ab2a2f0c3c129844a23a5c2daa1f32c, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::IronStormSlide
+  enableSlide: 1
+  slideAction: {fileID: 4621248548317510373, guid: 052faaac586de48259a63d0c4782560b, type: 3}
+  allowHoldSlideToTrigger: 1
+  requireRunningToSlide: 1
+  allowAirSlide: 1
+  allowHighSpeedSlideWithoutSprint: 1
+  highSpeedSlideThreshold: 0
+  slideSpeed: 25
+  minSlideSpeed: 2.4
+  slideDuration: 0.75
+  slideCooldown: 0.4
+  slideDeceleration: 8
+  slideSteerControl: 0.25
+  slideHeight: 0.9
+  stopSlideOnColliderHit: 1
+  overlapRadius: 3.52
+  overlapForwardProbe: 0.25
+  slideObstacleMask:
+    serializedVersion: 2
+    m_Bits: 4294967295
+  enableRunJumpSlideBoost: 1
+  jumpSlideSpeedMultiplier: 1.35
+  jumpSlideDurationMultiplier: 1.35
+  postLandJumpSlideWindow: 0.22
+  enableJumpPackFallSlide: 1
+  jumpPackFallSpeedMultiplier: 1.2
+  jumpPackFallDurationMultiplier: 1
+  postJumpPackLandSlideWindow: 0.35
+  minFallSpeedForHighPowerSlide: 3.5
+  maxSlideStepDistance: 1
+  slideAudioSource: {fileID: 1676835665823517505}
+  slideClip: {fileID: 0}
+  slideVolume: 1
+  pitchRandomness: 0.1
 --- !u!1 &5502667422601066646
 GameObject:
   m_ObjectHideFlags: 0
@@ -1480,6 +1502,9 @@ MonoBehaviour:
   mouseSensitivity: 2
   topClamp: 90
   bottomClamp: -90
+  syncCameraHeightWithBody: 1
+  extraCrouchCameraDrop: 2
+  cameraHeightSmoothSpeed: 12
   enforceUniformCameraScale: 0
   safeNearClipPlane: 0.1
   applySafeNearClipPlane: 0
@@ -1496,6 +1521,8 @@ MonoBehaviour:
   weaponCamera: {fileID: 0}
   affectMainCameraFovOnFlight: 1
   flightFovIncrease: 15
+  affectMainCameraFovOnSlide: 1
+  slideFovIncrease: 12
   fovTransitionSpeed: 10
   enableFlightShake: 1
   hoverShakeIntensity: 0.06

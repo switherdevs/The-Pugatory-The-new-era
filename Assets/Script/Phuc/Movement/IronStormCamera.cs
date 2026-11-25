@@ -1,10 +1,6 @@
 using UnityEngine;
 using UnityEngine.InputSystem;
 
-/// <summary>
-/// Điều khiển góc nhìn FPS, độ giật (recoil), rung góc nhìn (rotation shake & rotation bob -
-/// tuyệt đối KHÔNG rung position) và hiệu ứng FOV cho targetCamera / weaponCamera.
-/// </summary>
 public class IronStormCamera : MonoBehaviour
 {
     [Header("Mouse Settings (Góc nhìn chuột)")]
@@ -14,6 +10,14 @@ public class IronStormCamera : MonoBehaviour
     [SerializeField] private float topClamp = 90f;
     [Tooltip("Giới hạn góc cúi xuống tối thiểu (độ)")]
     [SerializeField] private float bottomClamp = -90f;
+
+    [Header("Crouch Height Sync (Hạ camera đúng theo chiều cao người chơi)")]
+    [Tooltip("Tự động hạ localPosition.y của camera theo chiều cao hiện tại của người chơi khi ngồi/trượt")]
+    [SerializeField] private bool syncCameraHeightWithBody = true;
+    [Tooltip("Độ hạ thêm (mét) khi ngồi (0 = khớp đúng theo chiều cao CharacterController)")]
+    [SerializeField] private float extraCrouchCameraDrop = 0f;
+    [Tooltip("Tốc độ nội suy hạ/nâng chiều cao camera")]
+    [SerializeField] private float cameraHeightSmoothSpeed = 12f;
 
     [Header("Anti-Distortion (Chống bóp méo object con)")]
     [Tooltip("Ép localScale của Transform camera về đều 3 trục để tránh object con bị méo")]
@@ -54,6 +58,10 @@ public class IronStormCamera : MonoBehaviour
     [SerializeField] private bool affectMainCameraFovOnFlight = false;
     [Tooltip("Độ tăng FOV khi bay Jump Pack")]
     [SerializeField] private float flightFovIncrease = 10f;
+    [Tooltip("Có mở rộng FOV của targetCamera khi đang trượt (Slide) hay không")]
+    [SerializeField] private bool affectMainCameraFovOnSlide = true;
+    [Tooltip("Độ mở rộng FOV khi đang trượt")]
+    [SerializeField] private float slideFovIncrease = 12f;
     [Tooltip("Tốc độ nội suy chuyển đổi FOV mượt mà")]
     [SerializeField] private float fovTransitionSpeed = 10f;
 
@@ -105,45 +113,44 @@ public class IronStormCamera : MonoBehaviour
     [Tooltip("Transform thân nhân vật (nhận xoay trục Y trái/phải)")]
     [SerializeField] private Transform playerBody;
 
-    // Trạng thái góc nhìn & recoil
     private float xRotation = 0f;
     private float currentRecoilX = 0f;
     private float currentRecoilY = 0f;
     private float targetRecoilX = 0f;
     private float targetRecoilY = 0f;
 
-    // Trạng thái rung rotation (shoot / generic shake)
     private float shakeTimer = 0f;
     private float shakeDurationTotal = 0.35f;
     private float shakeIntensity = 0f;
     private float shakePhase = 0f;
 
-    // Trạng thái rung rotation khi bay Jump Pack
     private float flightShakeTimer = 0f;
     private float currentFlightShakeIntensity = 0f;
     private bool isJumpPackFlying = false;
     private bool isJumpPackBoosting = false;
 
-    // Trạng thái rung rotation theo Idle / Walk / Run / Jump (không đổi position)
     private float bobPhase = 0f;
     private float currentBobFrequency = 1.5f;
     private float currentBobAmount = 0.12f;
 
-    // Lưu FOV gốc của targetCamera và weaponCamera để khôi phục chính xác
     private float baseFov = 60f;
     private float baseWeaponFov = 60f;
     private bool hasCachedMainFov = false;
     private bool hasCachedWeaponFov = false;
 
-    // Lưu scale ban đầu làm phương án dự phòng khi chuẩn hóa scale
+    private float baseLocalY = 0f;
+    private bool hasCachedBaseLocalY = false;
+
     private Vector3 initialCameraScale = Vector3.one;
 
-    // Tham chiếu script di chuyển
     private IronStormMovement movementRef;
 
     private void Awake()
     {
         initialCameraScale = transform.localScale;
+        baseLocalY = transform.localPosition.y;
+        hasCachedBaseLocalY = true;
+
         ResolveCameraReferences();
         CacheBaseFovs();
 
@@ -166,7 +173,6 @@ public class IronStormCamera : MonoBehaviour
             lookAction.action.Disable();
         }
 
-        // Khôi phục FOV gốc cho targetCamera và weaponCamera khi tắt component
         RestoreFovs();
     }
 
@@ -177,6 +183,12 @@ public class IronStormCamera : MonoBehaviour
 
         ResolveCameraReferences();
         CacheBaseFovs();
+
+        if (!hasCachedBaseLocalY)
+        {
+            baseLocalY = transform.localPosition.y;
+            hasCachedBaseLocalY = true;
+        }
 
         if (enforceUniformCameraScale)
         {
@@ -194,15 +206,15 @@ public class IronStormCamera : MonoBehaviour
         {
             movementRef = playerBody.GetComponent<IronStormMovement>();
         }
+        if (movementRef == null)
+        {
+            movementRef = GetComponentInParent<IronStormMovement>();
+        }
 
-        // Khởi tạo giá trị hiện tại bám theo cấu hình Idle ban đầu
         currentBobFrequency = idleFrequency;
         currentBobAmount = idleAngleAmount;
     }
 
-    /// <summary>
-    /// Tìm targetCamera dự phòng nếu chưa gán trong Inspector.
-    /// </summary>
     private void ResolveCameraReferences()
     {
         if (targetCamera == null)
@@ -215,9 +227,6 @@ public class IronStormCamera : MonoBehaviour
         }
     }
 
-    /// <summary>
-    /// Lưu FOV ban đầu một lần để không bị ghi đè sai khi đang nội suy.
-    /// </summary>
     private void CacheBaseFovs()
     {
         if (targetCamera != null && !hasCachedMainFov)
@@ -233,9 +242,6 @@ public class IronStormCamera : MonoBehaviour
         }
     }
 
-    /// <summary>
-    /// Khôi phục FOV gốc của targetCamera và weaponCamera.
-    /// </summary>
     private void RestoreFovs()
     {
         if (targetCamera != null && hasCachedMainFov)
@@ -249,9 +255,6 @@ public class IronStormCamera : MonoBehaviour
         }
     }
 
-    /// <summary>
-    /// Áp dụng safeNearClipPlane cho targetCamera và weaponCamera nếu được bật.
-    /// </summary>
     private void ApplySafeNearClipIfEnabled()
     {
         if (!applySafeNearClipPlane) return;
@@ -269,9 +272,6 @@ public class IronStormCamera : MonoBehaviour
         }
     }
 
-    /// <summary>
-    /// Chuẩn hóa localScale về đều nhau để tránh biến dạng object con.
-    /// </summary>
     private void NormalizeScaleIfNeeded(Transform t)
     {
         if (t == null) return;
@@ -288,9 +288,6 @@ public class IronStormCamera : MonoBehaviour
         }
     }
 
-    /// <summary>
-    /// Đọc input chuột từ InputActionReference, Mouse.current hoặc Legacy Input.
-    /// </summary>
     private Vector2 ReadLookInput()
     {
         Vector2 raw = Vector2.zero;
@@ -327,7 +324,6 @@ public class IronStormCamera : MonoBehaviour
 
     private void LateUpdate()
     {
-        // Giới hạn dt để tránh nhảy góc đột ngột khi lag hoặc khôi phục timeScale
         float dt = Mathf.Min(Time.deltaTime, 0.05f);
         float unscaledDt = Mathf.Min(Time.unscaledDeltaTime, 0.05f);
 
@@ -336,7 +332,8 @@ public class IronStormCamera : MonoBehaviour
             NormalizeScaleIfNeeded(transform);
         }
 
-        // 1. Góc nhìn cơ bản + Recoil
+        UpdateCameraHeightWithBody(dt);
+
         Vector2 mouseInput = ReadLookInput();
 
         xRotation -= mouseInput.y;
@@ -350,16 +347,13 @@ public class IronStormCamera : MonoBehaviour
 
         float finalXRotation = Mathf.Clamp(xRotation - currentRecoilX, bottomClamp, topClamp);
 
-        // 2. Cập nhật FOV cho targetCamera và weaponCamera
         UpdateCameraFovs(dt);
 
-        // 3. Rung Rotation khi Idle / Walk / Run / Jump (KHÔNG chạm vào localPosition)
         float bobPitch = 0f;
         float bobYaw = 0f;
         float bobRoll = 0f;
         ComputeMovementRotationBob(dt, out bobPitch, out bobYaw, out bobRoll);
 
-        // 4. Rung Rotation khi bắn / sự kiện shake
         float shakePitch = 0f;
         float shakeYaw = 0f;
         float shakeRoll = 0f;
@@ -387,7 +381,6 @@ public class IronStormCamera : MonoBehaviour
             }
         }
 
-        // 5. Rung Rotation khi bay Jump Pack
         float flightShakePitch = 0f;
         float flightShakeYaw = 0f;
         float targetFlightShake = 0f;
@@ -410,7 +403,6 @@ public class IronStormCamera : MonoBehaviour
             flightShakePitch = (Mathf.PerlinNoise(0f, flightShakeTimer) - 0.5f) * 2f * currentFlightShakeIntensity;
         }
 
-        // 6. Áp dụng tổng hợp Rotation cho camera & xoay trục Y cho thân nhân vật
         float appliedPitch = Mathf.Clamp(
             finalXRotation + bobPitch + shakePitch + flightShakePitch,
             bottomClamp,
@@ -428,10 +420,28 @@ public class IronStormCamera : MonoBehaviour
         }
     }
 
-    /// <summary>
-    /// Tính nhịp rung góc (Pitch, Yaw, Roll) theo trạng thái Idle, Walk, Run, Jump.
-    /// Khi đang bay Jump Pack thì giảm biên độ mục tiêu về 0 để nhường cho flight shake.
-    /// </summary>
+    private void UpdateCameraHeightWithBody(float dt)
+    {
+        if (!syncCameraHeightWithBody || !hasCachedBaseLocalY) return;
+        if (movementRef == null)
+        {
+            if (playerBody != null) movementRef = playerBody.GetComponent<IronStormMovement>();
+            if (movementRef == null) movementRef = GetComponentInParent<IronStormMovement>();
+        }
+        if (movementRef == null || !movementRef.enabled) return;
+
+        // Khi ngồi hoặc trượt, chiều cao camera bám đúng theo tỉ lệ chiều cao hiện tại của người chơi
+        float ratio = movementRef.HeightRatio;
+        float crouchExtra = (movementRef.IsCrouching || movementRef.IsSliding)
+            ? Mathf.Max(0f, extraCrouchCameraDrop) * (1f - ratio)
+            : 0f;
+
+        float targetLocalY = (baseLocalY * ratio) - crouchExtra;
+        Vector3 localPos = transform.localPosition;
+        localPos.y = Mathf.Lerp(localPos.y, targetLocalY, 1f - Mathf.Exp(-cameraHeightSmoothSpeed * dt));
+        transform.localPosition = localPos;
+    }
+
     private void ComputeMovementRotationBob(float dt, out float outPitch, out float outYaw, out float outRoll)
     {
         outPitch = 0f;
@@ -452,7 +462,6 @@ public class IronStormCamera : MonoBehaviour
 
             if (!isGrounded)
             {
-                // Đang nhảy / trên không: giữ tần số bước chân nhưng chuyển biên độ sang jumpAngleAmount
                 targetFrequency = walkFrequency;
                 targetAmount = jumpAngleAmount;
             }
@@ -463,7 +472,6 @@ public class IronStormCamera : MonoBehaviour
             }
             else
             {
-                // Đứng yên trên mặt đất (Idle)
                 targetFrequency = idleFrequency;
                 targetAmount = idleAngleAmount;
             }
@@ -472,26 +480,29 @@ public class IronStormCamera : MonoBehaviour
         currentBobFrequency = Mathf.Lerp(currentBobFrequency, targetFrequency, bobTransitionSmoothness * dt);
         currentBobAmount = Mathf.Lerp(currentBobAmount, targetAmount, bobTransitionSmoothness * dt);
 
-        // Tăng pha liên tục để sóng sin/cos không bị khựng khi đổi trạng thái
         bobPhase += dt * currentBobFrequency;
 
-        // Sóng sin/cos lệch pha giúp pitch, yaw, roll chuyển động tự nhiên như nhịp thở & bước chân
         outPitch = Mathf.Sin(bobPhase * 2f) * currentBobAmount * pitchAngleMultiplier;
         outYaw = Mathf.Cos(bobPhase * 0.5f) * currentBobAmount * yawAngleMultiplier;
         outRoll = Mathf.Sin(bobPhase) * currentBobAmount * rollAngleMultiplier;
     }
 
-    /// <summary>
-    /// Nội suy FOV cho targetCamera và giữ weaponCamera ổn định theo baseWeaponFov.
-    /// </summary>
     private void UpdateCameraFovs(float dt)
     {
         if (targetCamera != null)
         {
             CacheBaseFovs();
-            float desiredFov = (affectMainCameraFovOnFlight && isJumpPackFlying)
-                ? baseFov + flightFovIncrease
-                : baseFov;
+            bool isSlidingNow = movementRef != null && movementRef.enabled && movementRef.IsSliding;
+
+            float desiredFov = baseFov;
+            if (affectMainCameraFovOnFlight && isJumpPackFlying)
+            {
+                desiredFov += flightFovIncrease;
+            }
+            if (affectMainCameraFovOnSlide && isSlidingNow)
+            {
+                desiredFov += slideFovIncrease;
+            }
 
             targetCamera.fieldOfView = Mathf.Lerp(targetCamera.fieldOfView, desiredFov, fovTransitionSpeed * dt);
         }
@@ -503,18 +514,12 @@ public class IronStormCamera : MonoBehaviour
         }
     }
 
-    /// <summary>
-    /// Cập nhật trạng thái bay của Jump Pack.
-    /// </summary>
     public void SetJumpPackFlying(bool flying, bool boosting)
     {
         isJumpPackFlying = flying;
         isJumpPackBoosting = flying && boosting;
     }
 
-    /// <summary>
-    /// Cộng độ giật khi bắn súng, nhân thêm hệ số theo trạng thái di chuyển trên mặt đất.
-    /// </summary>
     public void AddRecoil(float recoilUp, float recoilSide)
     {
         float movementMultiplier = 1.0f;
@@ -532,22 +537,16 @@ public class IronStormCamera : MonoBehaviour
         }
 
         targetRecoilX += recoilUp * movementMultiplier;
-        targetRecoilY += Random.Range(-recoilSide, recoilSide) * movementMultiplier;
+        targetRecoilY += UnityEngine.Random.Range(-recoilSide, recoilSide) * movementMultiplier;
 
         targetRecoilX = Mathf.Clamp(targetRecoilX, 0f, maxRecoilPitch * 1.5f);
     }
 
-    /// <summary>
-    /// Kích hoạt rung góc nhìn nhanh khi bắn.
-    /// </summary>
     public void AddShootShake(float intensity)
     {
         TriggerCameraShake(defaultShakeDuration, Mathf.Max(0.25f, intensity));
     }
 
-    /// <summary>
-    /// Kích hoạt rung góc nhìn theo thời lượng và cường độ tùy chỉnh.
-    /// </summary>
     public void TriggerCameraShake(float duration, float intensity)
     {
         if (duration <= 0f || intensity <= 0f) return;
