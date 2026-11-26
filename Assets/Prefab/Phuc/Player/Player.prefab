@@ -700,6 +700,7 @@ GameObject:
   - component: {fileID: 7715651511247060650}
   - component: {fileID: 190011083210766913}
   - component: {fileID: 838388880556391756}
+  - component: {fileID: 4071964502354628133}
   m_Layer: 10
   m_Name: Player
   m_TagString: Player
@@ -852,7 +853,7 @@ MonoBehaviour:
   movementSmoothTime: 0.08
   groundStopDamping: 14
   airControlFactor: 0.75
-  jumpHeight: 2
+  jumpHeight: 3
   gravity: -30
   dashSpeed: 100
   dashDistance: 6
@@ -1200,6 +1201,7 @@ MonoBehaviour:
   enableSlide: 1
   slideAction: {fileID: 4621248548317510373, guid: 052faaac586de48259a63d0c4782560b, type: 3}
   allowHoldSlideToTrigger: 1
+  requireReleaseAfterHoldSlide: 1
   requireRunningToSlide: 1
   allowAirSlide: 1
   allowHighSpeedSlideWithoutSprint: 1
@@ -1209,6 +1211,7 @@ MonoBehaviour:
   slideDuration: 0.75
   slideCooldown: 0.4
   slideDeceleration: 8
+  highSpeedDecelerationMultiplier: 1.25
   slideSteerControl: 0.25
   slideHeight: 0.9
   stopSlideOnColliderHit: 1
@@ -1231,6 +1234,37 @@ MonoBehaviour:
   slideClip: {fileID: 0}
   slideVolume: 1
   pitchRandomness: 0.1
+--- !u!114 &4071964502354628133
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 5361435603796722228}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: e658c80742ec7cc4b9395899d28bfd1d, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::PlayerZipLineController
+  interactAction: {fileID: 1781555164194001046, guid: 052faaac586de48259a63d0c4782560b, type: 3}
+  jumpOffAction: {fileID: -2099379676528639254, guid: 052faaac586de48259a63d0c4782560b, type: 3}
+  interactRange: 3
+  gripHeightOffset: 1.6
+  maxStartProgress: 0.92
+  baseZipSpeed: 12
+  maxZipSpeed: 26
+  slopeAcceleration: 8
+  positionFollowSmoothness: 24
+  jumpOffUpwardBoost: 5.5
+  exitForwardMomentumMultiplier: 0.75
+  movementScript: {fileID: 5464887421486324670}
+  jumpPackScript: {fileID: 4864456756849798777}
+  slideScript: {fileID: 838388880556391756}
+  cameraScript: {fileID: 4768004406305984400}
+  zipAudioSource: {fileID: 1676835665823517505}
+  zipStartClip: {fileID: 0}
+  zipLoopClip: {fileID: 0}
+  audioVolume: 0.85
 --- !u!1 &5502667422601066646
 GameObject:
   m_ObjectHideFlags: 0
@@ -1523,12 +1557,18 @@ MonoBehaviour:
   flightFovIncrease: 15
   affectMainCameraFovOnSlide: 1
   slideFovIncrease: 12
-  fovTransitionSpeed: 10
+  affectMainCameraFovOnZipLine: 1
+  zipLineFovIncrease: 60
+  fovTransitionSpeed: 4
   enableFlightShake: 1
   hoverShakeIntensity: 0.06
   boostShakeIntensity: 0.14
   flightShakeFrequency: 24
   flightShakeSmoothness: 10
+  enableZipLineShake: 1
+  zipLineShakeIntensity: 0.22
+  zipLineShakeFrequency: 16
+  zipLineShakeSmoothness: 12
   enableRotationBob: 1
   bobTransitionSmoothness: 14
   rollAngleMultiplier: 1.6

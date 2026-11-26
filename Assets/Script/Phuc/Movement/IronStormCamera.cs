@@ -62,6 +62,10 @@ public class IronStormCamera : MonoBehaviour
     [SerializeField] private bool affectMainCameraFovOnSlide = true;
     [Tooltip("Độ mở rộng FOV khi đang trượt")]
     [SerializeField] private float slideFovIncrease = 12f;
+    [Tooltip("Có mở rộng FOV của targetCamera khi đang đu dây (Zip-Line) hay không")]
+    [SerializeField] private bool affectMainCameraFovOnZipLine = true;
+    [Tooltip("Độ mở rộng FOV khi đang đu dây")]
+    [SerializeField] private float zipLineFovIncrease = 14f;
     [Tooltip("Tốc độ nội suy chuyển đổi FOV mượt mà")]
     [SerializeField] private float fovTransitionSpeed = 10f;
 
@@ -76,6 +80,16 @@ public class IronStormCamera : MonoBehaviour
     [SerializeField] private float flightShakeFrequency = 28f;
     [Tooltip("Độ mượt khi chuyển cường độ rung lúc bay")]
     [SerializeField] private float flightShakeSmoothness = 12f;
+
+    [Header("Zip-Line Shake (Rung Rotation khi đu dây)")]
+    [Tooltip("Bật/tắt rung góc nhìn khi đang đu dây")]
+    [SerializeField] private bool enableZipLineShake = true;
+    [Tooltip("Cường độ rung góc khi đang đu dây")]
+    [SerializeField] private float zipLineShakeIntensity = 0.22f;
+    [Tooltip("Tần số rung góc khi đu dây")]
+    [SerializeField] private float zipLineShakeFrequency = 32f;
+    [Tooltip("Độ mượt khi chuyển cường độ rung lúc đu dây")]
+    [SerializeField] private float zipLineShakeSmoothness = 12f;
 
     [Header("Rotation Bob Settings (Chỉ rung Rotation khi Idle / Walk / Run / Jump)")]
     [Tooltip("Bật/tắt rung góc nhìn theo trạng thái đứng yên và di chuyển")]
@@ -129,6 +143,10 @@ public class IronStormCamera : MonoBehaviour
     private bool isJumpPackFlying = false;
     private bool isJumpPackBoosting = false;
 
+    private float zipLineShakeTimer = 0f;
+    private float currentZipLineShakeIntensity = 0f;
+    private bool isZipLining = false;
+
     private float bobPhase = 0f;
     private float currentBobFrequency = 1.5f;
     private float currentBobAmount = 0.12f;
@@ -173,6 +191,8 @@ public class IronStormCamera : MonoBehaviour
             lookAction.action.Disable();
         }
 
+        isZipLining = false;
+        currentZipLineShakeIntensity = 0f;
         RestoreFovs();
     }
 
@@ -403,12 +423,29 @@ public class IronStormCamera : MonoBehaviour
             flightShakePitch = (Mathf.PerlinNoise(0f, flightShakeTimer) - 0.5f) * 2f * currentFlightShakeIntensity;
         }
 
+        float zipLineShakePitch = 0f;
+        float zipLineShakeYaw = 0f;
+        float targetZipLineShake = (enableZipLineShake && isZipLining) ? Mathf.Max(0f, zipLineShakeIntensity) : 0f;
+
+        currentZipLineShakeIntensity = Mathf.Lerp(
+            currentZipLineShakeIntensity,
+            targetZipLineShake,
+            zipLineShakeSmoothness * dt
+        );
+
+        if (currentZipLineShakeIntensity > 0.0005f)
+        {
+            zipLineShakeTimer += dt * zipLineShakeFrequency;
+            zipLineShakeYaw = (Mathf.PerlinNoise(zipLineShakeTimer, 3.11f) - 0.5f) * 2f * currentZipLineShakeIntensity;
+            zipLineShakePitch = (Mathf.PerlinNoise(6.23f, zipLineShakeTimer) - 0.5f) * 2f * currentZipLineShakeIntensity;
+        }
+
         float appliedPitch = Mathf.Clamp(
-            finalXRotation + bobPitch + shakePitch + flightShakePitch,
+            finalXRotation + bobPitch + shakePitch + flightShakePitch + zipLineShakePitch,
             bottomClamp,
             topClamp
         );
-        float appliedYaw = bobYaw + shakeYaw + flightShakeYaw;
+        float appliedYaw = bobYaw + shakeYaw + flightShakeYaw + zipLineShakeYaw;
         float appliedRoll = bobRoll + shakeRoll;
 
         transform.localRotation = Quaternion.Euler(appliedPitch, appliedYaw, appliedRoll);
@@ -503,6 +540,10 @@ public class IronStormCamera : MonoBehaviour
             {
                 desiredFov += slideFovIncrease;
             }
+            if (affectMainCameraFovOnZipLine && isZipLining)
+            {
+                desiredFov += zipLineFovIncrease;
+            }
 
             targetCamera.fieldOfView = Mathf.Lerp(targetCamera.fieldOfView, desiredFov, fovTransitionSpeed * dt);
         }
@@ -518,6 +559,11 @@ public class IronStormCamera : MonoBehaviour
     {
         isJumpPackFlying = flying;
         isJumpPackBoosting = flying && boosting;
+    }
+
+    public void SetZipLineActive(bool active)
+    {
+        isZipLining = active;
     }
 
     public void AddRecoil(float recoilUp, float recoilSide)
