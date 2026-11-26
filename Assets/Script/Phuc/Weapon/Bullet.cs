@@ -17,6 +17,10 @@ public class Bullet : MonoBehaviour
     [SerializeField] private float hitCastRadius = 0.04f;
     [SerializeField] private HealthSystem.LoaiDoiTuong pheMucTieu = HealthSystem.LoaiDoiTuong.QuaiVat;
 
+    [Header("Stun / Body Part Effect")]
+    [Tooltip("Bật nếu đây là loại đạn có khả năng gây choáng khi trúng vùng Thân (vùng Đầu luôn gây choáng).")]
+    [SerializeField] private bool gayChoangKhiTrungThan = false;
+
     [Header("Physics Impact Settings")]
     [Tooltip("Lực đẩy tác động lên vật thể có Rigidbody khi trúng đạn.")]
     [SerializeField] private float hitForce = 15f;
@@ -186,6 +190,13 @@ public class Bullet : MonoBehaviour
     {
         if (obj == null) return false;
 
+        if (obj.GetComponent<EnemyBodyPartHitbox>() != null)
+        {
+            HealthSystem hitboxHp = obj.GetComponentInParent<HealthSystem>();
+            if (hitboxHp == null) return true;
+            return !hitboxHp.DaChet && hitboxHp.Phe == pheMucTieu;
+        }
+
         HealthSystem hp = obj.GetComponentInParent<HealthSystem>();
         if (hp != null && !hp.DaChet && hp.Phe == pheMucTieu)
         {
@@ -244,14 +255,26 @@ public class Bullet : MonoBehaviour
 
     private void ProcessImpact(Collider hitCollider, Vector3 contactPoint, Vector3 contactNormal, Transform hitTransform)
     {
-        // 1. GÂY SÁT THƯƠNG CHO MỤC TIÊU HỢP LỆ
+        // 1. GÂY SÁT THƯƠNG & HIỆU ỨNG THEO VÙNG CƠ THỂ (CHÂN / THÂN / ĐẦU)
         if (!hasDamaged && hitCollider != null)
         {
+            EnemyBodyPartHitbox bodyPart = hitCollider.GetComponent<EnemyBodyPartHitbox>();
             HealthSystem heThongMau = hitCollider.GetComponentInParent<HealthSystem>();
-            if (heThongMau != null && !heThongMau.DaChet && heThongMau.Phe == pheMucTieu && damage > 0f)
+
+            bool hopLePhe = heThongMau == null || (!heThongMau.DaChet && heThongMau.Phe == pheMucTieu);
+
+            if (hopLePhe && damage > 0f)
             {
                 hasDamaged = true;
-                heThongMau.NhanSatThuong(damage);
+
+                if (bodyPart != null)
+                {
+                    bodyPart.NhanDan(damage, gayChoangKhiTrungThan, contactPoint);
+                }
+                else if (heThongMau != null)
+                {
+                    heThongMau.NhanSatThuong(damage);
+                }
             }
         }
 
