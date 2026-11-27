@@ -166,6 +166,11 @@ MonoBehaviour:
   groundLayer:
     serializedVersion: 2
     m_Bits: 128
+  hienThiDamagePopup: 1
+  hienThiPopupVoiPlayer: 0
+  damagePopupPrefab: {fileID: 5280167209477989861, guid: f58fc49efd548dd4aaf3f9ceea0e4941, type: 3}
+  popupOffset: {x: 0, y: 0.25, z: 0}
+  popupJitter: 0.15
   bulletHolePrefab: {fileID: 1195073854184817349, guid: 97ee5e4d8ead35144be2c74be99655cf, type: 3}
   dustEffectPrefab: {fileID: 6478468706840558214, guid: 7b66017a28c3c1a40a462748ea2d118e, type: 3}
   offsetDistance: 0.001

@@ -73,17 +73,11 @@ public class DamageDealer : MonoBehaviour
         }
     }
 
-    /// <summary>
-    /// Nhận sát thương truyền từ RangedEnemyAI / súng qua SendMessage("SetDamage", value).
-    /// </summary>
     public void SetDamage(float amount)
     {
         satThuong = amount;
     }
 
-    /// <summary>
-    /// Gán người bắn để đảm bảo đạn không bao giờ tự va chạm với chính người bắn.
-    /// </summary>
     public void SetOwner(Transform ownerRoot)
     {
         chuSoHuu = ownerRoot;
@@ -194,7 +188,6 @@ public class DamageDealer : MonoBehaviour
         GameObject doiTuongVaCham = colliderVaCham.gameObject;
         HealthSystem heThongMau = doiTuongVaCham.GetComponentInParent<HealthSystem>();
 
-        // Bỏ qua hoàn toàn bản thân và đồng đội cùng phe (không sát thương, không đẩy vật lý, không hủy đạn)
         if (LaDongDoi(doiTuongVaCham, heThongMau))
         {
             return false;
@@ -226,15 +219,35 @@ public class DamageDealer : MonoBehaviour
             }
             else
             {
-                // Chống kích hoạt kép cả OnCollisionEnter và OnTriggerEnter cùng lúc trong 0.02s
                 if (thoiDiemTrungTheoMucTieu.TryGetValue(targetId, out float lastHitTime) && Time.time - lastHitTime < 0.02f)
                 {
                     return false;
                 }
             }
 
-            heThongMau.NhanSatThuong(satThuong);
-            HienThiDamagePopupTaiCollider(heThongMau, colliderVaCham, satThuong, diemVaCham);
+            EnemyBodyPartHitbox vungHitbox = colliderVaCham.GetComponent<EnemyBodyPartHitbox>();
+            if (vungHitbox == null)
+            {
+                vungHitbox = colliderVaCham.GetComponentInParent<EnemyBodyPartHitbox>();
+            }
+
+            bool trungDau = vungHitbox != null && vungHitbox.VungCoThe == EnemyBodyPartHitbox.LoaiVungCoThe.Dau;
+            float satThuongHienThi = satThuong;
+
+            if (vungHitbox != null)
+            {
+                // EnemyBodyPartHitbox tự tính hệ số vùng và gọi heThongMau.NhanSatThuong
+                float mauTruoc = heThongMau.MauHienTai;
+                vungHitbox.NhanDan(satThuong, laDanGayChoang: false, diemVaCham);
+                float mauSau = heThongMau.MauHienTai;
+                satThuongHienThi = Mathf.Max(0f, mauTruoc - mauSau);
+            }
+            else
+            {
+                heThongMau.NhanSatThuong(satThuong);
+            }
+
+            HienThiDamagePopupTaiCollider(heThongMau, colliderVaCham, satThuongHienThi, diemVaCham, trungDau);
             daGaySatThuong = true;
             thoiDiemTrungTheoMucTieu[targetId] = Time.time + thoiGianHoi;
 
@@ -253,7 +266,12 @@ public class DamageDealer : MonoBehaviour
         return daGaySatThuong;
     }
 
-    private void HienThiDamagePopupTaiCollider(HealthSystem mucTieu, Collider colliderMucTieu, float luongSatThuong, Vector3 diemChamFallback)
+    private void HienThiDamagePopupTaiCollider(
+        HealthSystem mucTieu,
+        Collider colliderMucTieu,
+        float luongSatThuong,
+        Vector3 diemChamFallback,
+        bool laTrungDau)
     {
         if (!hienThiDamagePopup || damagePopupPrefab == null || mucTieu == null || luongSatThuong <= 0f)
             return;
@@ -269,10 +287,13 @@ public class DamageDealer : MonoBehaviour
         );
 
         Vector3 viTriSpawn = viTriCollider + popupOffsetFromCollider + jitter;
+
+        // Sinh popup độc lập ở root Scene, không gắn làm con của quái hay bất kỳ GameObject nào
         DamagePopup3D popupInstance = Instantiate(damagePopupPrefab, viTriSpawn, Quaternion.identity);
         if (popupInstance != null)
         {
-            popupInstance.HienThi(luongSatThuong);
+            popupInstance.transform.SetParent(null, true);
+            popupInstance.HienThi(luongSatThuong, laTrungDau);
         }
     }
 

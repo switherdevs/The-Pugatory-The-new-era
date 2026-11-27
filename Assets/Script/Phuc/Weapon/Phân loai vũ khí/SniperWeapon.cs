@@ -1,6 +1,6 @@
+using System.Collections;
 using UnityEngine;
 using UnityEngine.InputSystem;
-using System.Collections;
 
 [RequireComponent(typeof(AudioSource))]
 public class SniperWeapon : MonoBehaviour
@@ -13,12 +13,16 @@ public class SniperWeapon : MonoBehaviour
     [Header("Ammo & Reserve System (Hệ thống đạn dự phòng)")]
     [Tooltip("Số lượng đạn dự phòng hiện tại.")]
     [SerializeField] private int reserveAmmo = 20;
+
     [Tooltip("Bật chế độ vô hạn đạn: Không tiêu hao đạn dự phòng.")]
     [SerializeField] private bool infiniteAmmo = false;
 
     [Header("Reload & Cocking Settings (Thay đạn & Lên đạn chuẩn AWP)")]
-    [Tooltip("Thời gian thay băng đạn (giây).")]
-    [SerializeField] private float reloadTime = 2.5f;
+    [Tooltip("Thời gian thay băng đạn khi VẪN CÒN đạn trong băng (giây - nhanh hơn).")]
+    [SerializeField] private float reloadTime = 2.1f;
+
+    [Tooltip("Thời gian thay băng đạn khi ĐÃ HẾT SẠCH đạn trong băng (giây - lâu hơn chút).")]
+    [SerializeField] private float emptyReloadTime = 2.7f;
 
     [Tooltip("Thời gian thực hiện động tác kéo búa/lên đạn (giây).")]
     [SerializeField] private float cockingTime = 0.6f;
@@ -89,7 +93,7 @@ public class SniperWeapon : MonoBehaviour
     [Tooltip("Tỷ lệ scale của RectTransform ảnh tâm ngắm ở mức Zoom 2 (Phóng to hơn).")]
     [SerializeField] private Vector3 zoom2ImageScale = new Vector3(1.5f, 1.5f, 1f);
 
-    private int zoomStage = 0; // 0: Không zoom, 1: Zoom lần 1, 2: Zoom lần 2
+    private int zoomStage = 0;
     private float targetFOV;
     private Camera mainCam;
     private PlayerAimAndLean aimAndLeanRef;
@@ -115,8 +119,7 @@ public class SniperWeapon : MonoBehaviour
 
     public void AddReserveAmmo(int amount)
     {
-        reserveAmmo += amount;
-        Debug.Log("Súng tỉa đã nhặt thêm " + amount + " viên đạn. Tổng dự phòng: " + reserveAmmo);
+        reserveAmmo += Mathf.Max(0, amount);
     }
 
     private void Awake()
@@ -206,10 +209,6 @@ public class SniperWeapon : MonoBehaviour
         }
 
         crosshairUI = FindFirstObjectByType<CrosshairController>();
-        if (crosshairUI == null)
-        {
-            Debug.LogWarning("Không tìm thấy CrosshairController trong Scene!");
-        }
 
         if (fireAction != null && fireAction.action != null) fireAction.action.Enable();
         if (reloadAction != null && reloadAction.action != null) reloadAction.action.Enable();
@@ -295,20 +294,18 @@ public class SniperWeapon : MonoBehaviour
         currentXOffset = Mathf.Lerp(currentXOffset, 0f, returnSpeed * Time.deltaTime);
         ApplyRotation();
 
-        // Kiểm tra lệnh thay đạn
-        if (reloadAction != null && reloadAction.action.triggered && !isReloading && !isCocking && !isRecoiling && currentAmmo < maxAmmo)
+        if (reloadAction != null && reloadAction.action != null &&
+            reloadAction.action.triggered && !isReloading && !isCocking && !isRecoiling && currentAmmo < maxAmmo)
         {
             if (!infiniteAmmo && reserveAmmo <= 0)
             {
-                Debug.Log("Hết sạch đạn dự phòng, không thể thay đạn!");
                 return;
             }
             StartReload();
             return;
         }
 
-        // Kiểm tra lệnh bóp cò
-        bool isFiringInput = fireAction != null && fireAction.action.triggered;
+        bool isFiringInput = fireAction != null && fireAction.action != null && fireAction.action.triggered;
 
         if (isFiringInput && !isReloading && !isRecoiling && !isCocking)
         {
@@ -321,10 +318,6 @@ public class SniperWeapon : MonoBehaviour
                 if (infiniteAmmo || reserveAmmo > 0)
                 {
                     StartReload();
-                }
-                else
-                {
-                    Debug.Log("Súng tỉa đã hết sạch đạn!");
                 }
             }
         }
@@ -339,7 +332,7 @@ public class SniperWeapon : MonoBehaviour
 
     private void HandleZoomInput()
     {
-        if (zoomAction != null && zoomAction.action.triggered)
+        if (zoomAction != null && zoomAction.action != null && zoomAction.action.triggered)
         {
             zoomStage++;
 
@@ -415,7 +408,9 @@ public class SniperWeapon : MonoBehaviour
         if (bulletPrefab != null && firePoint != null)
         {
             Vector3 targetPoint;
-            Ray ray = Camera.main.ViewportPointToRay(new Vector3(0.5f, 0.5f, 0f));
+            Ray ray = Camera.main != null
+                ? Camera.main.ViewportPointToRay(new Vector3(0.5f, 0.5f, 0f))
+                : new Ray(firePoint.position, firePoint.forward);
 
             if (Physics.Raycast(ray, out RaycastHit hit, 1000f))
             {
@@ -470,7 +465,12 @@ public class SniperWeapon : MonoBehaviour
         isReloading = true;
         isRecoiling = false;
         isCocking = false;
-        actionTimer = reloadTime;
+
+        // Còn đạn trong băng -> dùng reloadTime (nhanh hơn); hết sạch đạn trong băng -> dùng emptyReloadTime (lâu hơn)
+        bool hasAmmoInMag = currentAmmo > 0;
+        actionTimer = hasAmmoInMag
+            ? Mathf.Max(0.05f, reloadTime)
+            : Mathf.Max(0.05f, emptyReloadTime);
 
         if (actionAudioSource != null && reloadAudioClip != null)
         {

@@ -20,11 +20,16 @@ public class WeaponSystem : MonoBehaviour
     [Header("Ammo & Reserve System (Hệ thống đạn dự phòng)")]
     [Tooltip("Số lượng đạn dự phòng hiện tại.")]
     [SerializeField] private int reserveAmmo = 90;
+
     [Tooltip("Bật chế độ vô hạn đạn: Súng sẽ tự động nạp đầy liên tục mà không cần tiêu hao đạn dự phòng.")]
     [SerializeField] private bool infiniteAmmo = false;
 
-    [Tooltip("Thời gian thay đạn (giây).")]
-    [SerializeField] private float reloadTime = 2.0f;
+    [Tooltip("Thời gian thay đạn khi VẪN CÒN đạn trong băng (giây - nhanh hơn).")]
+    [SerializeField] private float reloadTime = 1.75f;
+
+    [Tooltip("Thời gian thay đạn khi ĐÃ HẾT SẠCH đạn trong băng (giây - lâu hơn chút).")]
+    [SerializeField] private float emptyReloadTime = 2.35f;
+
     private bool isReloading = false;
     private float reloadTimer = 0f;
     private float nextFireTime = 0f;
@@ -32,8 +37,10 @@ public class WeaponSystem : MonoBehaviour
     [Header("Recoil Settings (Độ giật súng)")]
     [Tooltip("Độ giật hướng lên trên mỗi khi bắn.")]
     [SerializeField] private float recoilUp = 1.5f;
+
     [Tooltip("Độ giật sang trái/phải ngẫu nhiên mỗi khi bắn.")]
     [SerializeField] private float recoilSide = 0.5f;
+
     [Tooltip("Hệ số nhân độ giật khi đang Aim (0.5 = giảm 50% độ giật).")]
     [Range(0f, 1f)]
     [SerializeField] private float aimRecoilMultiplier = 0.5f;
@@ -79,7 +86,7 @@ public class WeaponSystem : MonoBehaviour
 
     public int CurrentAmmo => currentAmmo;
     public int MaxAmmo => maxAmmo;
-    public int ReserveAmmo => reserveAmmo; // Truyền ra ngoài nếu cần làm UI hiển thị đạn dự phòng
+    public int ReserveAmmo => reserveAmmo;
     public WeaponType CurrentWeaponType => weaponType;
 
     private bool IsEquippedByPlayer()
@@ -113,13 +120,9 @@ public class WeaponSystem : MonoBehaviour
         weaponType = (weaponType == WeaponType.FullAuto) ? WeaponType.SemiAuto : WeaponType.FullAuto;
     }
 
-    /// <summary>
-    /// Hàm cộng thêm đạn dự phòng khi người chơi nhặt hộp đạn
-    /// </summary>
     public void AddReserveAmmo(int amount)
     {
-        reserveAmmo += amount;
-        Debug.Log("Đã nhặt thêm " + amount + " viên đạn dự phòng. Tổng: " + reserveAmmo);
+        reserveAmmo += Mathf.Max(0, amount);
     }
 
     private void Start()
@@ -140,16 +143,12 @@ public class WeaponSystem : MonoBehaviour
         }
 
         crosshairUI = FindFirstObjectByType<CrosshairController>();
-        if (crosshairUI == null)
-        {
-            Debug.LogWarning("Không tìm thấy CrosshairController trong Scene!");
-        }
 
-        if (fireAction != null && !fireAction.action.enabled)
+        if (fireAction != null && fireAction.action != null && !fireAction.action.enabled)
         {
             fireAction.action.Enable();
         }
-        if (reloadAction != null && !reloadAction.action.enabled)
+        if (reloadAction != null && reloadAction.action != null && !reloadAction.action.enabled)
         {
             reloadAction.action.Enable();
         }
@@ -183,13 +182,11 @@ public class WeaponSystem : MonoBehaviour
 
         ApplyRotation();
 
-        // Kiểm tra lệnh thay đạn từ người chơi (phím R)
-        if (reloadAction != null && reloadAction.action.triggered && !isReloading && currentAmmo < maxAmmo)
+        if (reloadAction != null && reloadAction.action != null &&
+            reloadAction.action.triggered && !isReloading && currentAmmo < maxAmmo)
         {
-            // Nếu không bật vô hạn đạn và hết sạch đạn dự phòng thì không cho thay đạn
             if (!infiniteAmmo && reserveAmmo <= 0)
             {
-                Debug.Log("Hết sạch đạn dự phòng, không thể thay đạn!");
                 return;
             }
 
@@ -198,26 +195,21 @@ public class WeaponSystem : MonoBehaviour
         }
 
         bool isFiringInput = (weaponType == WeaponType.FullAuto)
-            ? (fireAction != null && fireAction.action.IsPressed())
-            : (fireAction != null && fireAction.action.triggered);
+            ? (fireAction != null && fireAction.action != null && fireAction.action.IsPressed())
+            : (fireAction != null && fireAction.action != null && fireAction.action.triggered);
 
         if (isFiringInput && Time.time >= nextFireTime)
         {
             if (currentAmmo > 0)
             {
                 Shoot();
-                nextFireTime = Time.time + (60f / fireRate);
+                nextFireTime = Time.time + (60f / Mathf.Max(1f, fireRate));
             }
             else
             {
-                // Hết đạn trong băng -> Thử tự động thay đạn
                 if (infiniteAmmo || reserveAmmo > 0)
                 {
                     StartReload();
-                }
-                else
-                {
-                    Debug.Log("Hết đạn hoàn toàn! Không thể bắn.");
                 }
             }
         }
@@ -252,7 +244,9 @@ public class WeaponSystem : MonoBehaviour
         if (bulletPrefab != null && firePoint != null)
         {
             Vector3 targetPoint;
-            Ray ray = Camera.main.ViewportPointToRay(new Vector3(0.5f, 0.5f, 0f));
+            Ray ray = Camera.main != null
+                ? Camera.main.ViewportPointToRay(new Vector3(0.5f, 0.5f, 0f))
+                : new Ray(firePoint.position, firePoint.forward);
 
             if (Physics.Raycast(ray, out RaycastHit hit, 1000f))
             {
@@ -265,9 +259,7 @@ public class WeaponSystem : MonoBehaviour
 
             Vector3 shootDir = (targetPoint - firePoint.position).normalized;
             Quaternion shootRot = Quaternion.LookRotation(shootDir, Vector3.up);
-            GameObject bullet = Instantiate(bulletPrefab, firePoint.position, shootRot);
-
-            Bullet bulletScript = bullet.GetComponent<Bullet>();
+            Instantiate(bulletPrefab, firePoint.position, shootRot);
         }
 
         if (muzzleFlashPrefab != null && firePoint != null)
@@ -285,8 +277,14 @@ public class WeaponSystem : MonoBehaviour
     {
         if (isReloading) return;
 
+        // Còn đạn trong băng -> dùng reloadTime (nhanh hơn); hết sạch đạn trong băng -> dùng emptyReloadTime (lâu hơn)
+        bool hasAmmoInMag = currentAmmo > 0;
+        float chosenDuration = hasAmmoInMag
+            ? Mathf.Max(0.05f, reloadTime)
+            : Mathf.Max(0.05f, emptyReloadTime);
+
         isReloading = true;
-        reloadTimer = reloadTime;
+        reloadTimer = chosenDuration;
 
         if (audioSource != null && reloadAudioClip != null)
         {
@@ -299,12 +297,10 @@ public class WeaponSystem : MonoBehaviour
     {
         if (infiniteAmmo)
         {
-            // Chế độ vô hạn đạn: Luôn nạp đầy băng, không trừ đạn dự phòng
             currentAmmo = maxAmmo;
         }
         else
         {
-            // Tính số đạn cần thiết để nạp đầy băng
             int ammoNeeded = maxAmmo - currentAmmo;
 
             if (reserveAmmo >= ammoNeeded)
@@ -314,7 +310,6 @@ public class WeaponSystem : MonoBehaviour
             }
             else
             {
-                // Đạn dự phòng không đủ đầy một băng, gom hết số còn lại vào súng
                 currentAmmo += reserveAmmo;
                 reserveAmmo = 0;
             }
