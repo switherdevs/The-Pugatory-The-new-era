@@ -4,222 +4,255 @@ using UnityEngine.AI;
 public class EnemyBodyStatusEffect : MonoBehaviour
 {
     [Header("Tham Chiếu Model & Thành Phần Quái")]
-    [Tooltip("Transform phần mesh/visual của quái để ngã nhẹ về phía trước khi choáng (nếu để trống tự tìm object con đầu tiên).")]
-    [SerializeField] private Transform visualModelRoot;
+    [Tooltip("Transform phần mesh/visual của quái để nghiêng người khi choáng (nếu để trống sẽ tự tìm object con có Renderer).")]
+    [SerializeField] private Transform gocModelHienThi;
 
-    [Tooltip("Tốc độ nội suy ngã người khi choáng và đứng dậy khi hết choáng.")]
-    [SerializeField] private float tiltSmoothSpeed = 12f;
+    [Tooltip("Tốc độ nội suy nghiêng người khi vào choáng và đứng thẳng lại khi hết choáng.")]
+    [SerializeField] private float tocDoXoayMuot = 12f;
 
-    [Tooltip("Góc ngã người nhẹ về phía trước khi bị choáng (độ).")]
-    [SerializeField] private float stunForwardTiltAngle = 22f;
+    [Tooltip("Góc nghiêng người về phía trước khi bị choáng (đơn vị độ).")]
+    [SerializeField] private float gocNghiengKhiChoang = 22f;
 
-    private NavMeshAgent navMeshAgent;
-    private RangedEnemyAI rangedAI;
-    private MeleeEnemyAI meleeAI;
-    private HealthSystem healthSystem;
+    private NavMeshAgent dieuHuongNavMesh;
+    private RangedEnemyAI aiDanhXa;
+    private MeleeEnemyAI aiCanChien;
+    private HealthSystem heThongMau;
 
-    private float baseNavSpeed;
-    private bool hasCachedBaseNavSpeed;
+    // Lưu tốc độ di chuyển gốc ban đầu để khôi phục chính xác, tránh bị cộng dồn sai lệch
+    private float tocDoNavMeshGoc;
+    private bool daLuuTocDoGoc;
 
-    private float slowTimer;
-    private float currentSlowMultiplier = 1f;
+    // Biến quản lý trạng thái làm chậm
+    private float thoiGianConLaiLamCham;
+    private float heSoTocDoHienTai = 1f;
 
-    private float stunTimer;
-    private bool isStunned;
+    // Biến quản lý trạng thái choáng
+    private float thoiGianConLaiChoang;
+    private bool dangBiChoang;
 
-    private bool prevRangedEnabled;
-    private bool prevMeleeEnabled;
-    private bool prevNavStopped;
-    private bool hasSavedControlState;
+    // Lưu trạng thái bật/tắt AI trước khi bị choáng để khôi phục đúng trạng thái cũ
+    private bool trangThaiBatAIDanhXaTruocDo;
+    private bool trangThaiBatAICanChienTruocDo;
+    private bool trangThaiDungNavMeshTruocDo;
+    private bool daLuuTrangThaiDieuKhien;
 
-    public bool IsStunned => isStunned;
-    public bool IsSlowed => slowTimer > 0f;
-    public float CurrentSpeedMultiplier => isStunned ? 0f : currentSlowMultiplier;
+    public bool DangBiChoang => dangBiChoang;
+    public bool DangBiLamCham => thoiGianConLaiLamCham > 0f;
+    public float HeSoTocDoHienTai => dangBiChoang ? 0f : heSoTocDoHienTai;
 
     private void Awake()
     {
-        navMeshAgent = GetComponent<NavMeshAgent>();
-        rangedAI = GetComponent<RangedEnemyAI>();
-        meleeAI = GetComponent<MeleeEnemyAI>();
-        healthSystem = GetComponent<HealthSystem>();
+        dieuHuongNavMesh = GetComponent<NavMeshAgent>();
+        aiDanhXa = GetComponent<RangedEnemyAI>();
+        aiCanChien = GetComponent<MeleeEnemyAI>();
+        heThongMau = GetComponent<HealthSystem>();
 
-        if (visualModelRoot == null)
+        // Tự tìm object con chứa Renderer làm model hiển thị nếu người dùng chưa gán tay
+        if (gocModelHienThi == null)
         {
             for (int i = 0; i < transform.childCount; i++)
             {
-                Transform child = transform.GetChild(i);
-                if (child != null && child.GetComponentInChildren<Renderer>() != null)
+                Transform con = transform.GetChild(i);
+                if (con != null && con.GetComponentInChildren<Renderer>() != null)
                 {
-                    visualModelRoot = child;
+                    gocModelHienThi = con;
                     break;
                 }
             }
         }
 
-        CacheBaseSpeeds();
+        LuuTocDoGocNeuChuaCo();
     }
 
-    private void CacheBaseSpeeds()
+    // Lưu tốc độ gốc một lần duy nhất lúc khởi tạo để đảm bảo mọi máy tính toán đồng nhất
+    private void LuuTocDoGocNeuChuaCo()
     {
-        if (navMeshAgent != null && !hasCachedBaseNavSpeed)
+        if (dieuHuongNavMesh != null && !daLuuTocDoGoc)
         {
-            baseNavSpeed = navMeshAgent.speed;
-            hasCachedBaseNavSpeed = true;
+            tocDoNavMeshGoc = Mathf.Max(0f, dieuHuongNavMesh.speed);
+            daLuuTocDoGoc = true;
         }
     }
 
-    public void ApDungLamCham(float speedMultiplier, float duration)
+    /// <summary>
+    /// Áp dụng hiệu ứng làm chậm ngay lập tức (lấy mức chậm nặng hơn và thời gian dài hơn).
+    /// </summary>
+    public void ApDungLamCham(float heSoTocDo, float thoiGian)
     {
-        if (healthSystem != null && healthSystem.DaChet) return;
+        if (heThongMau != null && heThongMau.DaChet) return;
 
-        float clampedMult = Mathf.Clamp(speedMultiplier, 0.05f, 1f);
-        float clampedDur = Mathf.Max(0.1f, duration);
+        LuuTocDoGocNeuChuaCo();
 
-        currentSlowMultiplier = Mathf.Min(currentSlowMultiplier, clampedMult);
-        slowTimer = Mathf.Max(slowTimer, clampedDur);
+        float heSoAnToan = Mathf.Clamp(heSoTocDo, 0.05f, 1f);
+        float thoiGianAnToan = Mathf.Max(0.1f, thoiGian);
 
-        ApplySpeedModifier();
+        // Nếu đang bị làm chậm rồi thì giữ hệ số giảm tốc mạnh hơn (nhỏ hơn) và kéo dài thời gian nếu lâu hơn
+        heSoTocDoHienTai = Mathf.Min(heSoTocDoHienTai, heSoAnToan);
+        thoiGianConLaiLamCham = Mathf.Max(thoiGianConLaiLamCham, thoiGianAnToan);
+
+        CapNhatTocDoDiChuyen();
     }
 
-    public void ApDungChoang(float duration)
+    /// <summary>
+    /// Áp dụng hiệu ứng choáng ngay lập tức khi được gọi (không cần cộng dồn nhiều viên đạn).
+    /// </summary>
+    public void ApDungChoang(float thoiGian)
     {
-        if (healthSystem != null && healthSystem.DaChet) return;
+        if (heThongMau != null && heThongMau.DaChet) return;
 
-        float clampedDur = Mathf.Max(0.1f, duration);
-        stunTimer = Mathf.Max(stunTimer, clampedDur);
+        LuuTocDoGocNeuChuaCo();
 
-        if (!isStunned)
+        float thoiGianAnToan = Mathf.Max(0.1f, thoiGian);
+
+        // Cộng dồn/làm mới thời gian choáng theo mức lớn nhất để tránh bị giật thời gian ngắn lại
+        thoiGianConLaiChoang = Mathf.Max(thoiGianConLaiChoang, thoiGianAnToan);
+
+        if (!dangBiChoang)
         {
-            isStunned = true;
-            SaveAndDisableActiveAI();
+            dangBiChoang = true;
+            LuuVaTatAIHienTai();
 
-            if (navMeshAgent != null && navMeshAgent.enabled && navMeshAgent.isOnNavMesh)
+            // Dừng hẳn quán tính và di chuyển trên NavMesh khi bị choáng
+            if (dieuHuongNavMesh != null && dieuHuongNavMesh.enabled && dieuHuongNavMesh.isOnNavMesh)
             {
-                navMeshAgent.velocity = Vector3.zero;
-                navMeshAgent.isStopped = true;
+                dieuHuongNavMesh.velocity = Vector3.zero;
+                dieuHuongNavMesh.isStopped = true;
             }
+
+            CapNhatTocDoDiChuyen();
         }
     }
 
-    private void SaveAndDisableActiveAI()
+    // Lưu trạng thái cũ rồi tạm tắt AI để quái không tấn công/điều khiển NavMesh khi đang choáng
+    private void LuuVaTatAIHienTai()
     {
-        if (hasSavedControlState) return;
-        hasSavedControlState = true;
+        if (daLuuTrangThaiDieuKhien) return;
+        daLuuTrangThaiDieuKhien = true;
 
-        if (navMeshAgent != null)
+        if (dieuHuongNavMesh != null)
         {
-            prevNavStopped = navMeshAgent.isStopped;
+            trangThaiDungNavMeshTruocDo = dieuHuongNavMesh.isStopped;
         }
 
-        if (rangedAI != null)
+        if (aiDanhXa != null)
         {
-            prevRangedEnabled = rangedAI.enabled;
-            rangedAI.enabled = false;
+            trangThaiBatAIDanhXaTruocDo = aiDanhXa.enabled;
+            aiDanhXa.enabled = false;
         }
 
-        if (meleeAI != null)
+        if (aiCanChien != null)
         {
-            prevMeleeEnabled = meleeAI.enabled;
-            meleeAI.enabled = false;
+            trangThaiBatAICanChienTruocDo = aiCanChien.enabled;
+            aiCanChien.enabled = false;
         }
     }
 
-    private void RestoreActiveAI()
+    // Khôi phục lại trạng thái bật/tắt AI và NavMesh khi hết choáng
+    private void KhoiPhucAIHienTai()
     {
-        if (!hasSavedControlState) return;
-        hasSavedControlState = false;
+        if (!daLuuTrangThaiDieuKhien) return;
+        daLuuTrangThaiDieuKhien = false;
 
-        if (rangedAI != null)
+        if (aiDanhXa != null)
         {
-            rangedAI.enabled = prevRangedEnabled;
-            rangedAI.NhanSatThuong(0f);
+            aiDanhXa.enabled = trangThaiBatAIDanhXaTruocDo;
         }
 
-        if (meleeAI != null)
+        if (aiCanChien != null)
         {
-            meleeAI.enabled = prevMeleeEnabled;
-            meleeAI.NhanSatThuong(0f);
+            aiCanChien.enabled = trangThaiBatAICanChienTruocDo;
         }
 
-        if (navMeshAgent != null && navMeshAgent.enabled && navMeshAgent.isOnNavMesh)
+        if (dieuHuongNavMesh != null && dieuHuongNavMesh.enabled && dieuHuongNavMesh.isOnNavMesh)
         {
-            navMeshAgent.isStopped = prevNavStopped;
+            dieuHuongNavMesh.isStopped = trangThaiDungNavMeshTruocDo;
         }
+
+        CapNhatTocDoDiChuyen();
     }
 
-    private void ApplySpeedModifier()
+    // Cập nhật tốc độ NavMesh theo trạng thái choáng hoặc làm chậm dựa trên tốc độ gốc đã lưu
+    private void CapNhatTocDoDiChuyen()
     {
-        CacheBaseSpeeds();
-        if (navMeshAgent != null && navMeshAgent.enabled)
+        if (dieuHuongNavMesh == null || !dieuHuongNavMesh.enabled) return;
+
+        LuuTocDoGocNeuChuaCo();
+
+        if (dangBiChoang)
         {
-            if (isStunned)
-            {
-                navMeshAgent.speed = 0f;
-            }
-            else
-            {
-                float targetBase = Mathf.Max(baseNavSpeed, navMeshAgent.speed);
-                baseNavSpeed = targetBase;
-                navMeshAgent.speed = baseNavSpeed * currentSlowMultiplier;
-            }
+            dieuHuongNavMesh.speed = 0f;
+        }
+        else
+        {
+            dieuHuongNavMesh.speed = tocDoNavMeshGoc * heSoTocDoHienTai;
         }
     }
 
     private void Update()
     {
-        float dt = Mathf.Min(Time.deltaTime, 0.05f);
-        if (dt <= 0f) return;
+        // Giới hạn deltaTime tối đa 0.05s để khi tụt FPS mạnh hoặc chuyển cửa sổ không bị nhảy trạng thái quá đà
+        float deltaThoiGian = Mathf.Min(Time.deltaTime, 0.05f);
+        if (deltaThoiGian <= 0f) return;
 
-        if (healthSystem != null && healthSystem.DaChet)
+        // Nếu quái chết thì xóa trạng thái hiệu ứng và trả lại góc xoay bình thường
+        if (heThongMau != null && heThongMau.DaChet)
         {
-            isStunned = false;
-            stunTimer = 0f;
-            slowTimer = 0f;
+            dangBiChoang = false;
+            thoiGianConLaiChoang = 0f;
+            thoiGianConLaiLamCham = 0f;
+            heSoTocDoHienTai = 1f;
+            daLuuTrangThaiDieuKhien = false;
+            CapNhatGocNghiengKhiChoang(deltaThoiGian);
             return;
         }
 
-        if (slowTimer > 0f)
+        // Đếm ngược thời gian làm chậm
+        if (thoiGianConLaiLamCham > 0f)
         {
-            slowTimer = Mathf.Max(0f, slowTimer - dt);
-            if (slowTimer <= 0f)
+            thoiGianConLaiLamCham = Mathf.Max(0f, thoiGianConLaiLamCham - deltaThoiGian);
+            if (thoiGianConLaiLamCham <= 0f)
             {
-                currentSlowMultiplier = 1f;
+                heSoTocDoHienTai = 1f;
             }
         }
 
-        if (isStunned)
+        // Đếm ngược thời gian choáng
+        if (dangBiChoang)
         {
-            stunTimer -= dt;
-            if (navMeshAgent != null && navMeshAgent.enabled && navMeshAgent.isOnNavMesh)
+            thoiGianConLaiChoang -= deltaThoiGian;
+
+            if (dieuHuongNavMesh != null && dieuHuongNavMesh.enabled && dieuHuongNavMesh.isOnNavMesh)
             {
-                navMeshAgent.velocity = Vector3.zero;
-                navMeshAgent.isStopped = true;
+                dieuHuongNavMesh.velocity = Vector3.zero;
+                dieuHuongNavMesh.isStopped = true;
             }
 
-            if (stunTimer <= 0f)
+            if (thoiGianConLaiChoang <= 0f)
             {
-                stunTimer = 0f;
-                isStunned = false;
-                RestoreActiveAI();
+                thoiGianConLaiChoang = 0f;
+                dangBiChoang = false;
+                KhoiPhucAIHienTai();
             }
         }
 
-        ApplySpeedModifier();
-        UpdateStunForwardTilt(dt);
+        CapNhatTocDoDiChuyen();
+        CapNhatGocNghiengKhiChoang(deltaThoiGian);
     }
 
-    private void UpdateStunForwardTilt(float dt)
+    // Nội suy góc nghiêng model mượt mà theo thời gian thực để đảm bảo đồng nhất giữa máy mạnh và máy yếu
+    private void CapNhatGocNghiengKhiChoang(float deltaThoiGian)
     {
-        if (visualModelRoot == null) return;
+        if (gocModelHienThi == null) return;
 
-        Quaternion targetLocalRot = isStunned
-            ? Quaternion.Euler(stunForwardTiltAngle, 0f, 0f)
+        Quaternion gocMucTieu = dangBiChoang
+            ? Quaternion.Euler(gocNghiengKhiChoang, 0f, 0f)
             : Quaternion.identity;
 
-        visualModelRoot.localRotation = Quaternion.Slerp(
-            visualModelRoot.localRotation,
-            targetLocalRot,
-            tiltSmoothSpeed * dt
+        float heSoNoiSuy = 1f - Mathf.Exp(-tocDoXoayMuot * deltaThoiGian);
+        gocModelHienThi.localRotation = Quaternion.Slerp(
+            gocModelHienThi.localRotation,
+            gocMucTieu,
+            heSoNoiSuy
         );
     }
 }

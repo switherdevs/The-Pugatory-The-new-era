@@ -1,8 +1,5 @@
-using UnityEngine;
 using System.Collections.Generic;
-#if UNITY_EDITOR
-using UnityEditor;
-#endif
+using UnityEngine;
 
 public class TagSelectorAttribute : PropertyAttribute { }
 
@@ -36,12 +33,12 @@ public class Bullet : MonoBehaviour
     [Tooltip("Khoảng cách bù trừ đẩy lỗ đạn lùi ra xa bề mặt để không bị chìm lấp.")]
     [SerializeField] private float offsetDistance = 0.005f;
 
-    // Quản lý tối đa 30 lỗ đạn (Cơ chế FIFO)
     private static readonly List<GameObject> activeBulletHoles = new List<GameObject>();
     private const int maxBulletHoles = 30;
 
     private Rigidbody rb;
     private Collider bulletCollider;
+    private DamageDealer damageDealer;
     private Transform ownerRoot;
     private Vector3 moveDirection = Vector3.forward;
     private bool hasCollided = false;
@@ -52,6 +49,7 @@ public class Bullet : MonoBehaviour
     {
         rb = GetComponent<Rigidbody>();
         bulletCollider = GetComponent<Collider>();
+        damageDealer = GetComponent<DamageDealer>();
 
         if (rb != null)
         {
@@ -72,12 +70,6 @@ public class Bullet : MonoBehaviour
 
     private void Start()
     {
-        DamageDealer dealer = GetComponent<DamageDealer>();
-        if (dealer != null)
-        {
-            dealer.enabled = false;
-        }
-
         if (transform.forward.sqrMagnitude > 0.0001f)
         {
             moveDirection = transform.forward.normalized;
@@ -86,10 +78,10 @@ public class Bullet : MonoBehaviour
         lastPosition = transform.position;
         Destroy(gameObject, Mathf.Max(0.05f, lifeTime));
 
-        IgnoreOwnerAndPlayerCollisions();
+        IgnoreOwnerAndAlliedCollisions();
     }
 
-    private void IgnoreOwnerAndPlayerCollisions()
+    private void IgnoreOwnerAndAlliedCollisions()
     {
         if (bulletCollider == null) return;
 
@@ -105,15 +97,23 @@ public class Bullet : MonoBehaviour
             }
         }
 
-        GameObject player = GameObject.FindGameObjectWithTag("Player");
-        if (player != null)
+        HealthSystem.LoaiDoiTuong pheDongDoi = pheMucTieu == HealthSystem.LoaiDoiTuong.QuaiVat
+            ? HealthSystem.LoaiDoiTuong.NguoiChoi
+            : HealthSystem.LoaiDoiTuong.QuaiVat;
+
+        HealthSystem[] allHealths = FindObjectsByType<HealthSystem>(FindObjectsSortMode.None);
+        for (int i = 0; i < allHealths.Length; i++)
         {
-            Collider[] playerCols = player.GetComponentsInChildren<Collider>(true);
-            for (int i = 0; i < playerCols.Length; i++)
+            HealthSystem hp = allHealths[i];
+            if (hp != null && hp.Phe == pheDongDoi)
             {
-                if (playerCols[i] != null)
+                Collider[] allyCols = hp.GetComponentsInChildren<Collider>(true);
+                for (int j = 0; j < allyCols.Length; j++)
                 {
-                    Physics.IgnoreCollision(bulletCollider, playerCols[i], true);
+                    if (allyCols[j] != null)
+                    {
+                        Physics.IgnoreCollision(bulletCollider, allyCols[j], true);
+                    }
                 }
             }
         }
@@ -132,12 +132,34 @@ public class Bullet : MonoBehaviour
     public void SetDamage(float amount)
     {
         damage = Mathf.Max(0f, amount);
+        if (damageDealer != null)
+        {
+            damageDealer.SetDamage(damage);
+        }
     }
 
     public void SetOwner(Transform owner)
     {
         ownerRoot = owner != null ? owner.root : null;
-        IgnoreOwnerAndPlayerCollisions();
+        if (damageDealer != null && ownerRoot != null)
+        {
+            damageDealer.SetOwner(ownerRoot);
+        }
+        IgnoreOwnerAndAlliedCollisions();
+    }
+
+    private bool IsFriendlyTarget(GameObject obj)
+    {
+        if (obj == null) return false;
+        if (ownerRoot != null && obj.transform.root == ownerRoot) return true;
+
+        HealthSystem hp = obj.GetComponentInParent<HealthSystem>();
+        if (hp != null && hp.Phe != pheMucTieu)
+        {
+            return true;
+        }
+
+        return false;
     }
 
     private void Update()
@@ -155,7 +177,7 @@ public class Bullet : MonoBehaviour
         if (stepDistance > 0.0001f &&
             Physics.SphereCast(startPos, castRadius, moveDirection, out RaycastHit hit, stepDistance + castRadius, ~0, QueryTriggerInteraction.Collide))
         {
-            if (IsIgnoredOwner(hit.collider))
+            if (IsIgnoredOwner(hit.collider) || IsFriendlyTarget(hit.collider.gameObject))
             {
                 transform.position = nextPos;
                 lastPosition = nextPos;
@@ -188,7 +210,7 @@ public class Bullet : MonoBehaviour
 
     private bool IsValidTarget(GameObject obj)
     {
-        if (obj == null) return false;
+        if (obj == null || IsFriendlyTarget(obj)) return false;
 
         if (obj.GetComponent<EnemyBodyPartHitbox>() != null)
         {
@@ -227,7 +249,7 @@ public class Bullet : MonoBehaviour
 
     private void OnTriggerEnter(Collider other)
     {
-        if (hasCollided || IsIgnoredOwner(other)) return;
+        if (hasCollided || IsIgnoredOwner(other) || IsFriendlyTarget(other.gameObject)) return;
 
         if (IsValidTarget(other.gameObject))
         {
@@ -255,8 +277,12 @@ public class Bullet : MonoBehaviour
 
     private void ProcessImpact(Collider hitCollider, Vector3 contactPoint, Vector3 contactNormal, Transform hitTransform)
     {
-        // 1. GÂY SÁT THƯƠNG & HIỆU ỨNG THEO VÙNG CƠ THỂ (CHÂN / THÂN / ĐẦU)
-        if (!hasDamaged && hitCollider != null)
+        if (hitCollider == null || IsFriendlyTarget(hitCollider.gameObject))
+        {
+            return;
+        }
+
+        if (!hasDamaged)
         {
             EnemyBodyPartHitbox bodyPart = hitCollider.GetComponent<EnemyBodyPartHitbox>();
             HealthSystem heThongMau = hitCollider.GetComponentInParent<HealthSystem>();
@@ -278,7 +304,6 @@ public class Bullet : MonoBehaviour
             }
         }
 
-        // 2. TƯƠNG TÁC VẬT LÝ
         if (hitTransform != null)
         {
             Rigidbody hitRb = hitTransform.GetComponentInParent<Rigidbody>();
@@ -295,7 +320,6 @@ public class Bullet : MonoBehaviour
 
     private void SpawnEffects(Vector3 point, Vector3 normal, bool isGround, Transform hitTransform)
     {
-        // 3. Tạo lỗ đạn và bám sát bề mặt lưới mesh
         if (bulletHolePrefab != null)
         {
             Quaternion rot;
@@ -331,7 +355,6 @@ public class Bullet : MonoBehaviour
             Destroy(hole, 10f);
         }
 
-        // 4. Tạo hiệu ứng bụi / tia lửa
         if (dustEffectPrefab != null)
         {
             Quaternion baseRot = Quaternion.LookRotation(normal);
@@ -358,23 +381,3 @@ public class Bullet : MonoBehaviour
         }
     }
 }
-
-#if UNITY_EDITOR
-[CustomPropertyDrawer(typeof(TagSelectorAttribute))]
-public class TagSelectorPropertyDrawer : PropertyDrawer
-{
-    public override void OnGUI(Rect position, SerializedProperty property, GUIContent label)
-    {
-        if (property.propertyType == SerializedPropertyType.String)
-        {
-            EditorGUI.BeginProperty(position, label, property);
-            property.stringValue = EditorGUI.TagField(position, label, property.stringValue);
-            EditorGUI.EndProperty();
-        }
-        else
-        {
-            EditorGUI.PropertyField(position, property, label);
-        }
-    }
-}
-#endif

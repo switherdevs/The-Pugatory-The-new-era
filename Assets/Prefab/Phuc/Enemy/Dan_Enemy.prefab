@@ -157,6 +157,10 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::Bullet
   speed: 150
   lifeTime: 5
+  damage: 20
+  hitCastRadius: 0.04
+  pheMucTieu: 0
+  gayChoangKhiTrungThan: 0
   hitForce: 15
   targetTag: Wall
   groundLayer:
@@ -179,10 +183,17 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::DamageDealer
   pheGaySatThuong: 1
   satThuong: 15
-  huySauKhiVaCham: 0
+  huySauKhiVaCham: 1
   thoiGianTonTaiToiDa: 5
   thoiGianHoiSatThuongLienTuc: 0.5
-  hieuUngVaCham: {fileID: 0}
+  hienThiDamagePopup: 0
+  hienThiVoiPlayer: 0
+  damagePopupPrefab: {fileID: 0}
+  popupOffsetFromCollider: {x: 0, y: 0.25, z: 0}
+  popupRandomJitter: 0.15
+  gaySatThuongQuaCollision: 1
+  gaySatThuongQuaTrigger: 1
+  gaySatThuongKhiDangCham: 1
 --- !u!1 &2322612796663411877
 GameObject:
   m_ObjectHideFlags: 0

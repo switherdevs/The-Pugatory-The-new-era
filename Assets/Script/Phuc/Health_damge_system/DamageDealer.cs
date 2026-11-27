@@ -26,8 +26,21 @@ public class DamageDealer : MonoBehaviour
     [Tooltip("Thời gian giãn cách giữa 2 lần gây sát thương liên tục nếu mục tiêu đứng trong vùng bẫy (giây).")]
     [SerializeField] private float thoiGianHoiSatThuongLienTuc = 0.5f;
 
-    [Tooltip("Hiệu ứng tia lửa/nổ khi đạn va chạm (tùy chọn).")]
-    [SerializeField] private GameObject hieuUngVaCham;
+    [Header("Damage Popup Settings (Tại Collider Quái)")]
+    [Tooltip("Bật/tắt hiển thị popup sát thương khi trúng quái.")]
+    [SerializeField] private bool hienThiDamagePopup = true;
+
+    [Tooltip("Chỉ hiện popup khi trúng Player nếu bật tùy chọn này (mặc định TẮT: không hiện với Player).")]
+    [SerializeField] private bool hienThiVoiPlayer = false;
+
+    [Tooltip("Prefab có gắn script DamagePopup3D (TextMeshPro 3D).")]
+    [SerializeField] private DamagePopup3D damagePopupPrefab;
+
+    [Tooltip("Độ lệch vị trí cộng thêm tính từ tâm collider của quái.")]
+    [SerializeField] private Vector3 popupOffsetFromCollider = new Vector3(0f, 0.25f, 0f);
+
+    [Tooltip("Độ lệch ngẫu nhiên nhẹ quanh tâm collider để tránh các số sát thương đè khít nhau.")]
+    [SerializeField] private float popupRandomJitter = 0.15f;
 
     [Header("Chế độ nhận va chạm (Collision & Trigger)")]
     [Tooltip("Cho phép gây sát thương thông qua OnCollisionEnter / OnCollisionStay (va chạm vật lý cứng).")]
@@ -40,12 +53,20 @@ public class DamageDealer : MonoBehaviour
     [SerializeField] private bool gaySatThuongKhiDangCham = true;
 
     private Transform chuSoHuu;
+    private Collider[] ownColliders;
     private float thoiDiemGaySatThuongTiepTheo = 0f;
-    private readonly Dictionary<int, float> thoiDiemTrúngTheoMucTieu = new Dictionary<int, float>();
+    private readonly Dictionary<int, float> thoiDiemTrungTheoMucTieu = new Dictionary<int, float>();
     private bool daBiHuyHoacHoanTat = false;
+
+    private void Awake()
+    {
+        ownColliders = GetComponentsInChildren<Collider>(true);
+    }
 
     private void Start()
     {
+        IgnoreAlliedCollisions();
+
         if (thoiGianTonTaiToiDa > 0f && huySauKhiVaCham)
         {
             Destroy(gameObject, thoiGianTonTaiToiDa);
@@ -66,45 +87,119 @@ public class DamageDealer : MonoBehaviour
     public void SetOwner(Transform ownerRoot)
     {
         chuSoHuu = ownerRoot;
+        IgnoreAlliedCollisions();
+    }
+
+    private void IgnoreAlliedCollisions()
+    {
+        if (ownColliders == null || ownColliders.Length == 0)
+        {
+            ownColliders = GetComponentsInChildren<Collider>(true);
+        }
+        if (ownColliders == null || ownColliders.Length == 0) return;
+
+        if (chuSoHuu != null)
+        {
+            Collider[] ownerCols = chuSoHuu.root.GetComponentsInChildren<Collider>(true);
+            IgnorePairs(ownColliders, ownerCols);
+        }
+
+        if (pheGaySatThuong == PheGaySatThuong.TatCa) return;
+
+        HealthSystem.LoaiDoiTuong pheDongDoi = pheGaySatThuong == PheGaySatThuong.TuQuaiVat
+            ? HealthSystem.LoaiDoiTuong.QuaiVat
+            : HealthSystem.LoaiDoiTuong.NguoiChoi;
+
+        HealthSystem[] allHealths = FindObjectsByType<HealthSystem>(FindObjectsSortMode.None);
+        for (int i = 0; i < allHealths.Length; i++)
+        {
+            HealthSystem hp = allHealths[i];
+            if (hp != null && hp.Phe == pheDongDoi)
+            {
+                Collider[] allyCols = hp.GetComponentsInChildren<Collider>(true);
+                IgnorePairs(ownColliders, allyCols);
+            }
+        }
+    }
+
+    private static void IgnorePairs(Collider[] sourceCols, Collider[] targetCols)
+    {
+        if (sourceCols == null || targetCols == null) return;
+        for (int i = 0; i < sourceCols.Length; i++)
+        {
+            if (sourceCols[i] == null) continue;
+            for (int j = 0; j < targetCols.Length; j++)
+            {
+                if (targetCols[j] == null) continue;
+                Physics.IgnoreCollision(sourceCols[i], targetCols[j], true);
+            }
+        }
+    }
+
+    private bool LaDongDoi(GameObject doiTuongVaCham, HealthSystem heThongMau)
+    {
+        if (doiTuongVaCham == null) return false;
+
+        if (chuSoHuu != null && doiTuongVaCham.transform.root == chuSoHuu.root)
+        {
+            return true;
+        }
+
+        if (heThongMau != null)
+        {
+            if (pheGaySatThuong == PheGaySatThuong.TuQuaiVat && heThongMau.Phe == HealthSystem.LoaiDoiTuong.QuaiVat)
+            {
+                return true;
+            }
+
+            if (pheGaySatThuong == PheGaySatThuong.TuNguoiChoi && heThongMau.Phe == HealthSystem.LoaiDoiTuong.NguoiChoi)
+            {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     private void OnTriggerEnter(Collider other)
     {
         if (!gaySatThuongQuaTrigger || other == null) return;
-        XuLyVaCham(other.gameObject, other.ClosestPoint(transform.position), laVaChamLienTuc: false);
+        XuLyVaCham(other, other.ClosestPoint(transform.position), laVaChamLienTuc: false);
     }
 
     private void OnTriggerStay(Collider other)
     {
         if (!gaySatThuongQuaTrigger || !gaySatThuongKhiDangCham || huySauKhiVaCham || other == null) return;
-        XuLyVaCham(other.gameObject, other.ClosestPoint(transform.position), laVaChamLienTuc: true);
+        XuLyVaCham(other, other.ClosestPoint(transform.position), laVaChamLienTuc: true);
     }
 
     private void OnCollisionEnter(Collision collision)
     {
         if (!gaySatThuongQuaCollision || collision == null) return;
         Vector3 diemCham = collision.contactCount > 0 ? collision.GetContact(0).point : transform.position;
-        XuLyVaCham(collision.gameObject, diemCham, laVaChamLienTuc: false);
+        XuLyVaCham(collision.collider, diemCham, laVaChamLienTuc: false);
     }
 
     private void OnCollisionStay(Collision collision)
     {
         if (!gaySatThuongQuaCollision || !gaySatThuongKhiDangCham || huySauKhiVaCham || collision == null) return;
         Vector3 diemCham = collision.contactCount > 0 ? collision.GetContact(0).point : transform.position;
-        XuLyVaCham(collision.gameObject, diemCham, laVaChamLienTuc: true);
+        XuLyVaCham(collision.collider, diemCham, laVaChamLienTuc: true);
     }
 
-    private bool XuLyVaCham(GameObject doiTuongVaCham, Vector3 diemVaCham, bool laVaChamLienTuc)
+    private bool XuLyVaCham(Collider colliderVaCham, Vector3 diemVaCham, bool laVaChamLienTuc)
     {
-        if (daBiHuyHoacHoanTat || doiTuongVaCham == null) return false;
+        if (daBiHuyHoacHoanTat || colliderVaCham == null) return false;
 
-        // Bỏ qua chính người bắn
-        if (chuSoHuu != null && doiTuongVaCham.transform.root == chuSoHuu.root)
+        GameObject doiTuongVaCham = colliderVaCham.gameObject;
+        HealthSystem heThongMau = doiTuongVaCham.GetComponentInParent<HealthSystem>();
+
+        // Bỏ qua hoàn toàn bản thân và đồng đội cùng phe (không sát thương, không đẩy vật lý, không hủy đạn)
+        if (LaDongDoi(doiTuongVaCham, heThongMau))
         {
             return false;
         }
 
-        HealthSystem heThongMau = doiTuongVaCham.GetComponentInParent<HealthSystem>();
         bool daGaySatThuong = false;
 
         if (heThongMau != null)
@@ -124,7 +219,7 @@ public class DamageDealer : MonoBehaviour
                     return false;
                 }
 
-                if (thoiDiemTrúngTheoMucTieu.TryGetValue(targetId, out float nextTargetHitTime) && Time.time < nextTargetHitTime)
+                if (thoiDiemTrungTheoMucTieu.TryGetValue(targetId, out float nextTargetHitTime) && Time.time < nextTargetHitTime)
                 {
                     return false;
                 }
@@ -132,25 +227,21 @@ public class DamageDealer : MonoBehaviour
             else
             {
                 // Chống kích hoạt kép cả OnCollisionEnter và OnTriggerEnter cùng lúc trong 0.02s
-                if (thoiDiemTrúngTheoMucTieu.TryGetValue(targetId, out float lastHitTime) && Time.time - lastHitTime < 0.02f)
+                if (thoiDiemTrungTheoMucTieu.TryGetValue(targetId, out float lastHitTime) && Time.time - lastHitTime < 0.02f)
                 {
                     return false;
                 }
             }
 
             heThongMau.NhanSatThuong(satThuong);
+            HienThiDamagePopupTaiCollider(heThongMau, colliderVaCham, satThuong, diemVaCham);
             daGaySatThuong = true;
-            thoiDiemTrúngTheoMucTieu[targetId] = Time.time + thoiGianHoi;
+            thoiDiemTrungTheoMucTieu[targetId] = Time.time + thoiGianHoi;
 
             if (laVaChamLienTuc)
             {
                 thoiDiemGaySatThuongTiepTheo = Time.time + thoiGianHoi;
             }
-        }
-
-        if (hieuUngVaCham != null)
-        {
-            Instantiate(hieuUngVaCham, diemVaCham, Quaternion.identity);
         }
 
         if (huySauKhiVaCham)
@@ -160,6 +251,29 @@ public class DamageDealer : MonoBehaviour
         }
 
         return daGaySatThuong;
+    }
+
+    private void HienThiDamagePopupTaiCollider(HealthSystem mucTieu, Collider colliderMucTieu, float luongSatThuong, Vector3 diemChamFallback)
+    {
+        if (!hienThiDamagePopup || damagePopupPrefab == null || mucTieu == null || luongSatThuong <= 0f)
+            return;
+
+        if (mucTieu.Phe == HealthSystem.LoaiDoiTuong.NguoiChoi && !hienThiVoiPlayer)
+            return;
+
+        Vector3 viTriCollider = colliderMucTieu != null ? colliderMucTieu.bounds.center : diemChamFallback;
+        Vector3 jitter = new Vector3(
+            Random.Range(-popupRandomJitter, popupRandomJitter),
+            Random.Range(-popupRandomJitter * 0.5f, popupRandomJitter),
+            Random.Range(-popupRandomJitter, popupRandomJitter)
+        );
+
+        Vector3 viTriSpawn = viTriCollider + popupOffsetFromCollider + jitter;
+        DamagePopup3D popupInstance = Instantiate(damagePopupPrefab, viTriSpawn, Quaternion.identity);
+        if (popupInstance != null)
+        {
+            popupInstance.HienThi(luongSatThuong);
+        }
     }
 
     private bool CoHopLeDeGaySatThuong(HealthSystem mucTieu)
