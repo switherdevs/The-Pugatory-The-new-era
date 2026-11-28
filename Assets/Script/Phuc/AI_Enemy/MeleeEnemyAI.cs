@@ -1,5 +1,4 @@
 using UnityEngine;
-using UnityEngine.AI;
 #if UNITY_EDITOR
 using UnityEditor;
 #endif
@@ -15,8 +14,8 @@ public class ChonTagCanChienDrawer : PropertyDrawer
         if (property.propertyType == SerializedPropertyType.String)
         {
             EditorGUI.BeginProperty(position, label, property);
-            string currentTag = string.IsNullOrEmpty(property.stringValue) ? "Untagged" : property.stringValue;
-            property.stringValue = EditorGUI.TagField(position, label, currentTag);
+            string tagHienTai = string.IsNullOrEmpty(property.stringValue) ? "Untagged" : property.stringValue;
+            property.stringValue = EditorGUI.TagField(position, label, tagHienTai);
             EditorGUI.EndProperty();
         }
         else
@@ -28,6 +27,7 @@ public class ChonTagCanChienDrawer : PropertyDrawer
 #endif
 
 [RequireComponent(typeof(Collider))]
+[RequireComponent(typeof(DoDuongRaycastAI))]
 public class MeleeEnemyAI : MonoBehaviour
 {
     public enum TrangThaiAI
@@ -37,111 +37,64 @@ public class MeleeEnemyAI : MonoBehaviour
         TruyDuoi,
         TimKiem,
         TanCong,
-        VeChoCu
+        VeChoCu,
+        BoChayLuuDan
     }
 
     [Header("Phát hiện & Tầm nhìn")]
-    [Tooltip("Layer của người chơi.")]
     [SerializeField] private LayerMask layerNguoiChoi;
 
-    [Tooltip("Tag của tường / chướng ngại vật che khuất tầm nhìn và kiểm tra tường (chọn từ dropdown Tag).")]
     [ChonTagCanChien]
     [SerializeField] private string tagVatCan = "Untagged";
 
-    [Tooltip("Độ dài tia Raycast kiểm tra tường phía trước theo hướng di chuyển (tăng/giảm tùy ý).")]
-    [SerializeField] private float doDaiKiemTraTuong = 2.2f;
-
-    [Tooltip("Bán kính tầm nhìn mặc định của quái.")]
     [SerializeField] private float banKinhTamNhin = 18f;
 
-    [Tooltip("Góc nhìn ngang mặc định (độ) tính từ hướng nhìn phía trước của quái.")]
     [Range(10f, 360f)]
     [SerializeField] private float gocNhin = 110f;
 
-    [Tooltip("Góc nhìn hướng lên trên (độ) tính từ mặt phẳng ngang của mắt quái.")]
     [Range(0f, 90f)]
     [SerializeField] private float gocNhinTren = 35f;
 
-    [Tooltip("Góc nhìn hướng xuống dưới (độ) tính từ mặt phẳng ngang của mắt quái.")]
     [Range(0f, 90f)]
     [SerializeField] private float gocNhinDuoi = 35f;
 
     [Header("Tăng Vùng Nhìn Khi Truy Đuổi")]
-    [Tooltip("Hệ số nhân bán kính tầm nhìn khi đang trong trạng thái Truy Đuổi (ví dụ 1.5 = tăng 50%).")]
     [SerializeField] private float heSoTangBanKinhTruyDuoi = 1.5f;
-
-    [Tooltip("Hệ số nhân góc nhìn ngang khi đang trong trạng thái Truy Đuổi (ví dụ 1.4 = mở rộng góc nhìn).")]
     [SerializeField] private float heSoTangGocTruyDuoi = 1.4f;
-
-    [Tooltip("Hệ số nhân góc nhìn trên/dưới khi đang trong trạng thái Truy Đuổi (ví dụ 1.35 = tăng 35%).")]
     [SerializeField] private float heSoTangGocDocTruyDuoi = 1.35f;
 
-    [Tooltip("Điểm xuất phát tia kiểm tra tầm nhìn (nếu để trống tự tính từ mắt/thân quái).")]
     [SerializeField] private Transform diemDatMat;
-
-    [Tooltip("Thời gian quái tiếp tục nhớ/truy đuổi sau khi bị tường che trước khi mất dấu.")]
     [SerializeField] private float thoiGianNhoDau = 4.5f;
 
-    [Tooltip("Khoảng cách tìm điểm vòng sang hai bên để luồn qua tường khi bị chắn.")]
-    [SerializeField] private float khoangCachVongTuong = 4.5f;
-
-    [Header("Tìm kiếm khi mất dấu & Kiểm tra vực thẳm")]
-    [Tooltip("Thời gian quái tìm kiếm quanh nơi lần cuối thấy Player trước khi về tuần tra hoặc canh gác (mặc định 10 giây).")]
+    [Header("Tìm kiếm khi mất dấu & Xử lý vực thẳm")]
     [SerializeField] private float thoiGianTimKiemKhiMatDau = 10f;
-
-    [Tooltip("Bán kính quái đảo/tìm kiếm xung quanh vị trí cuối cùng thấy Player.")]
     [SerializeField] private float banKinhTimKiem = 6.5f;
-
-    [Tooltip("Bật/tắt kiểm tra vực thẳm phía trước để quái dừng lại và đổi hướng khi gặp vực.")]
-    [SerializeField] private bool kiemTraVucTham = true;
-
-    [Tooltip("Layer của mặt đất / sàn vững chắc dùng để dò vực thẳm.")]
-    [SerializeField] private LayerMask layerMatDat = ~0;
-
-    [Tooltip("Khoảng cách dò phía trước chân quái để phát hiện mép vực.")]
-    [SerializeField] private float khoangCachDoVucTham = 1.35f;
-
-    [Tooltip("Độ sâu tối đa dò xuống dưới mép trước; sâu hơn mức này được coi là vực thẳm.")]
-    [SerializeField] private float doSauVucTham = 2.5f;
-
-    [Tooltip("Nếu bật: khi bị vực thẳm ngăn cách với Player và không tìm thấy đường khác, quái bỏ đi và dù quay lại thấy Player cũng không quan tâm.")]
     [SerializeField] private bool boDiKhiBiVucThamChan = true;
 
+    [Header("Bỏ chạy & kiếm chỗ trốn khi nhận tin lựu đạn (Ưu tiên cao nhất)")]
+    [SerializeField] private float thoiGianBoChayLuuDan = 3.0f;
+    [SerializeField] private float khoangCachBoChayLuuDan = 9.5f;
+    [SerializeField] private float tocDoBoChayLuuDan = 8.5f;
+    [SerializeField] private float banKinhTimChoTronLuuDan = 14f;
+    [SerializeField] private float khoangCachAnSauVatCan = 1.6f;
+
     [Header("Chế độ Lính canh & Tuần tra")]
-    [Tooltip("Nếu bật: chỉ đứng yên tại vị trí đặt, thấy Player hoặc bị tấn công mới truy đuổi; mất dấu sẽ tìm kiếm rồi về chỗ cũ canh gác.")]
     [SerializeField] private bool laLinhCanh = false;
-
-    [Tooltip("Thời gian đi tuần tra tìm kiếm sau khi mất dấu Player (dành cho lính canh).")]
     [SerializeField] private float thoiGianTuanTraKhiMatDau = 5f;
-
-    [Tooltip("Danh sách điểm tuần tra (nếu để trống sẽ tự tuần tra quanh vị trí đặt).")]
     [SerializeField] private Transform[] cacDiemTuanTra;
-
-    [Tooltip("Bán kính tuần tra ngẫu nhiên nếu không gán Các Điểm Tuần Tra.")]
     [SerializeField] private float banKinhTuanTraNgauNhien = 8f;
-
-    [Tooltip("Khoảng cách mỗi bước đi tuần tra theo hướng mới.")]
     [SerializeField] private float khoangCachBuocTuanTra = 5f;
 
     [SerializeField] private float thoiGianNghi = 2f;
     [SerializeField] private float tocDoTuanTra = 3.5f;
     [SerializeField] private float tocDoTruyDuoi = 6.5f;
-    [SerializeField] private float tocDoXoayHuong = 10f;
+    [SerializeField] private float tocDoXoayHuong = 14f;
 
     [Header("Tấn công cận chiến")]
-    [Tooltip("Khoảng cách để bắt đầu tấn công cận chiến.")]
     [SerializeField] private float tamDanhCanChien = 2.2f;
-
-    [Tooltip("Thời gian hồi giữa hai đòn đánh cận chiến (giây).")]
     [SerializeField] private float thoiGianHoiDonDanh = 1.25f;
-
-    [Tooltip("Sát thương mỗi đòn cận chiến.")]
     [SerializeField] private float satThuongCanChien = 20f;
-
-    [Tooltip("Bán kính vùng va chạm đòn đánh cận chiến.")]
     [SerializeField] private float banKinhVungDanh = 1.4f;
-
-    [Tooltip("Điểm tâm vùng đánh cận chiến (nếu để trống tự lấy trước mặt quái).")]
     [SerializeField] private Transform diemTamDonDanh;
 
     [Header("Âm thanh")]
@@ -157,7 +110,8 @@ public class MeleeEnemyAI : MonoBehaviour
     [SerializeField] private Color mauVungTamNhin = new Color(1f, 0.85f, 0.1f, 0.18f);
     [SerializeField] private Color mauTamDanh = new Color(1f, 0.2f, 0.2f, 0.25f);
 
-    private NavMeshAgent dieuHuongNavMesh;
+    private DoDuongRaycastAI boDoDuong;
+    private EnemyAlertSystem heThongBaoDong;
     private TrangThaiAI trangThaiHienTai = TrangThaiAI.NghiNgoi;
 
     private Vector3 viTriBanDau;
@@ -165,7 +119,6 @@ public class MeleeEnemyAI : MonoBehaviour
 
     private Transform mucTieuNguoiChoiHienTai;
     private Vector3 viTriNguoiChoiCuoiCung;
-    private Vector3 diemLuonTuongHienTai;
     private Vector3 diemTimKiemHienTai;
     private bool daCoDiemTimKiem = false;
     private bool daBoDiViVucTham = false;
@@ -175,12 +128,28 @@ public class MeleeEnemyAI : MonoBehaviour
     private bool daPhatAmThanhPhatHien = false;
     private float boDemBuocChan = 0f;
 
+    private Vector3 viTriLuuDanNguyHiem;
+    private Vector3 diemBoChayLuuDan;
+    private bool daCoDiemBoChayLuuDan = false;
+    private float boDemThoiGianBoChay = 0f;
+
     private int chiSoDiemTuanTra = 0;
     private Vector3 diemDenTuanTraHienTai;
     private Quaternion huongTuanTraHienTai;
     private bool daCoDiemDenTuanTra = false;
     private float boDemThoiGianNghi = 0f;
     private float thoiDiemDanhTiepTheo = 0f;
+
+    // Giới hạn deltaTime tối đa 0.05s để mô phỏng ổn định trên mọi mức FPS và cấu hình máy
+    private float LayDeltaTimeAnToan()
+    {
+        return Mathf.Min(Time.deltaTime, 0.05f);
+    }
+
+    private bool DangUuTienBoChayLuuDan()
+    {
+        return trangThaiHienTai == TrangThaiAI.BoChayLuuDan || boDemThoiGianBoChay > 0f;
+    }
 
     private float LayBanKinhTamNhinHienTai()
     {
@@ -235,12 +204,14 @@ public class MeleeEnemyAI : MonoBehaviour
         gocBanDau = transform.rotation;
         huongTuanTraHienTai = transform.rotation;
 
-        dieuHuongNavMesh = GetComponent<NavMeshAgent>();
-        if (dieuHuongNavMesh != null)
+        // Lấy bộ dò đường raycast chủ đạo để di chuyển và né collider
+        boDoDuong = GetComponent<DoDuongRaycastAI>();
+        if (boDoDuong == null)
         {
-            dieuHuongNavMesh.speed = tocDoTuanTra;
-            dieuHuongNavMesh.stoppingDistance = Mathf.Max(0.5f, tamDanhCanChien * 0.8f);
+            boDoDuong = gameObject.AddComponent<DoDuongRaycastAI>();
         }
+
+        heThongBaoDong = GetComponent<EnemyAlertSystem>();
 
         if (nguonAmThanh == null)
         {
@@ -262,8 +233,154 @@ public class MeleeEnemyAI : MonoBehaviour
         trangThaiHienTai = laLinhCanh ? TrangThaiAI.NghiNgoi : TrangThaiAI.TuanTra;
     }
 
+    public void NhanBaoDong(Transform mucTieu, Vector3 viTriPlayer)
+    {
+        if (DangUuTienBoChayLuuDan()) return;
+
+        daBoDiViVucTham = false;
+        if (mucTieu != null) mucTieuNguoiChoiHienTai = mucTieu;
+        viTriNguoiChoiCuoiCung = viTriPlayer;
+        daCoDiemTimKiem = false;
+        daCoDiemDenTuanTra = false;
+        boDemThoiGianNhoDau = thoiGianNhoDau;
+        boDemThoiGianTimKiem = thoiGianTimKiemKhiMatDau;
+        boDemTuanTraMatDau = thoiGianTuanTraKhiMatDau;
+
+        if (!daPhatAmThanhPhatHien)
+        {
+            PhatAmThanh(amThanhPhatHien);
+            daPhatAmThanhPhatHien = true;
+        }
+
+        if (trangThaiHienTai != TrangThaiAI.TanCong)
+        {
+            trangThaiHienTai = TrangThaiAI.TruyDuoi;
+            DiChuyenToiViTri(viTriPlayer, tocDoTruyDuoi);
+        }
+    }
+
+    public void NhanBaoDongLuuDan(Vector3 viTriLuuDan)
+    {
+        viTriLuuDanNguyHiem = viTriLuuDan;
+        boDemThoiGianBoChay = Mathf.Max(0.2f, thoiGianBoChayLuuDan);
+        daCoDiemBoChayLuuDan = false;
+        trangThaiHienTai = TrangThaiAI.BoChayLuuDan;
+        ChonDiemBoChayLuuDan();
+    }
+
+    private bool CoVatCanCheLuuDanTaiDiem(Vector3 diemTron)
+    {
+        Vector3 diemBatDau = viTriLuuDanNguyHiem + Vector3.up * 0.85f;
+        Vector3 diemKetThuc = diemTron + Vector3.up * 0.85f;
+        return BiVatCanChan(diemBatDau, diemKetThuc);
+    }
+
+    private void ChonDiemBoChayLuuDan()
+    {
+        float banKinhTim = Mathf.Max(4f, banKinhTimChoTronLuuDan);
+        float khoangCachAnToanVatCan = Mathf.Max(0.8f, khoangCachAnSauVatCan);
+        float khoangCachHienTaiToiLuuDan = Vector3.Distance(transform.position, viTriLuuDanNguyHiem);
+
+        if (!string.IsNullOrEmpty(tagVatCan) && tagVatCan != "Untagged")
+        {
+            Collider[] cacVatCan = Physics.OverlapSphere(transform.position, banKinhTim, ~0, QueryTriggerInteraction.Ignore);
+            float diemTotNhat = float.MinValue;
+            Vector3 choTronTotNhat = Vector3.zero;
+            bool timThayChoTron = false;
+
+            if (cacVatCan != null)
+            {
+                for (int i = 0; i < cacVatCan.Length; i++)
+                {
+                    Collider col = cacVatCan[i];
+                    if (col == null) continue;
+                    if (!CoTagVatCan(col.transform)) continue;
+
+                    Vector3 tamVatCan = col.bounds.center;
+                    Vector3 huongTuLuuDanToiVatCan = tamVatCan - viTriLuuDanNguyHiem;
+                    huongTuLuuDanToiVatCan.y = 0f;
+                    if (huongTuLuuDanToiVatCan.sqrMagnitude < 0.01f) continue;
+                    huongTuLuuDanToiVatCan.Normalize();
+
+                    float banKinhVatCan = Mathf.Max(col.bounds.extents.x, col.bounds.extents.z);
+                    Vector3 diemSauVatCan = tamVatCan + huongTuLuuDanToiVatCan * (banKinhVatCan + khoangCachAnToanVatCan);
+                    diemSauVatCan.y = transform.position.y;
+
+                    if (boDoDuong != null && boDoDuong.LaVucThamTheoHuong(diemSauVatCan - transform.position)) continue;
+                    if (!CoVatCanCheLuuDanTaiDiem(diemSauVatCan)) continue;
+
+                    // Đã sửa đúng tên biến viTriLuuDanNguyHiem
+                    float khoangCachXaLuuDan = Vector3.Distance(diemSauVatCan, viTriLuuDanNguyHiem);
+                    float khoangCachDiToi = Vector3.Distance(transform.position, diemSauVatCan);
+                    float diemDanhGia = khoangCachXaLuuDan * 2.0f - khoangCachDiToi * 0.5f;
+
+                    if (khoangCachXaLuuDan > khoangCachHienTaiToiLuuDan && diemDanhGia > diemTotNhat)
+                    {
+                        diemTotNhat = diemDanhGia;
+                        choTronTotNhat = diemSauVatCan;
+                        timThayChoTron = true;
+                    }
+                }
+            }
+
+            if (timThayChoTron)
+            {
+                diemBoChayLuuDan = choTronTotNhat;
+                daCoDiemBoChayLuuDan = true;
+                return;
+            }
+        }
+
+        Vector3 huongChay = transform.position - viTriLuuDanNguyHiem;
+        huongChay.y = 0f;
+        if (huongChay.sqrMagnitude < 0.001f)
+        {
+            huongChay = -transform.forward;
+            huongChay.y = 0f;
+        }
+        huongChay.Normalize();
+
+        float khoangCach = Mathf.Max(3.5f, khoangCachBoChayLuuDan);
+        diemBoChayLuuDan = transform.position + huongChay * khoangCach;
+        daCoDiemBoChayLuuDan = true;
+    }
+
+    private void XuLyBoChayLuuDan()
+    {
+        float dt = LayDeltaTimeAnToan();
+        trangThaiHienTai = TrangThaiAI.BoChayLuuDan;
+        boDemThoiGianBoChay -= dt;
+
+        if (boDemThoiGianBoChay <= 0f)
+        {
+            boDemThoiGianBoChay = 0f;
+            daCoDiemBoChayLuuDan = false;
+            trangThaiHienTai = mucTieuNguoiChoiHienTai != null
+                ? TrangThaiAI.TruyDuoi
+                : (laLinhCanh ? TrangThaiAI.VeChoCu : TrangThaiAI.TuanTra);
+            return;
+        }
+
+        if (!daCoDiemBoChayLuuDan || Vector3.Distance(transform.position, diemBoChayLuuDan) <= 1.1f)
+        {
+            ChonDiemBoChayLuuDan();
+        }
+
+        DiChuyenToiViTri(diemBoChayLuuDan, tocDoBoChayLuuDan);
+        XoayMatVeMucTieu(diemBoChayLuuDan);
+    }
+
     private void Update()
     {
+        float dt = LayDeltaTimeAnToan();
+
+        if (DangUuTienBoChayLuuDan())
+        {
+            XuLyBoChayLuuDan();
+            CapNhatAmThanhBuocChan();
+            return;
+        }
+
         bool coTheThayNgayBayGio = QuetThayNguoiChoi();
 
         if (coTheThayNgayBayGio && mucTieuNguoiChoiHienTai != null)
@@ -278,6 +395,11 @@ public class MeleeEnemyAI : MonoBehaviour
             boDemThoiGianNhoDau = thoiGianNhoDau;
             boDemThoiGianTimKiem = thoiGianTimKiemKhiMatDau;
             boDemTuanTraMatDau = thoiGianTuanTraKhiMatDau;
+
+            if (heThongBaoDong != null)
+            {
+                heThongBaoDong.PhatBaoDong(mucTieuNguoiChoiHienTai, viTriNguoiChoiCuoiCung);
+            }
         }
         else
         {
@@ -288,7 +410,7 @@ public class MeleeEnemyAI : MonoBehaviour
 
             if (boDemThoiGianNhoDau > 0f)
             {
-                boDemThoiGianNhoDau -= Time.deltaTime;
+                boDemThoiGianNhoDau -= dt;
                 if (boDemThoiGianNhoDau <= 0f)
                 {
                     mucTieuNguoiChoiHienTai = null;
@@ -320,7 +442,13 @@ public class MeleeEnemyAI : MonoBehaviour
         {
             mucTieuNguoiChoiHienTai = nguoiChoiGan[0].transform;
             viTriNguoiChoiCuoiCung = mucTieuNguoiChoiHienTai.position;
+            if (heThongBaoDong != null && !DangUuTienBoChayLuuDan())
+            {
+                heThongBaoDong.PhatBaoDong(mucTieuNguoiChoiHienTai, viTriNguoiChoiCuoiCung);
+            }
         }
+
+        if (DangUuTienBoChayLuuDan()) return;
 
         if (trangThaiHienTai == TrangThaiAI.NghiNgoi ||
             trangThaiHienTai == TrangThaiAI.VeChoCu ||
@@ -338,6 +466,11 @@ public class MeleeEnemyAI : MonoBehaviour
 
     private bool BiVatCanChan(Vector3 diemDau, Vector3 diemCuoi)
     {
+        if (boDoDuong != null)
+        {
+            return boDoDuong.BiVatCanChanGiuaHaiDiem(diemDau, diemCuoi);
+        }
+
         if (string.IsNullOrEmpty(tagVatCan) || tagVatCan == "Untagged")
         {
             return false;
@@ -365,27 +498,6 @@ public class MeleeEnemyAI : MonoBehaviour
         return false;
     }
 
-    private bool CoTuongPhiaTruoc(Vector3 huongDiChuyen)
-    {
-        if (string.IsNullOrEmpty(tagVatCan) || tagVatCan == "Untagged")
-        {
-            return false;
-        }
-
-        float doDaiTia = Mathf.Max(0.1f, doDaiKiemTraTuong);
-        Vector3 huongNgang = new Vector3(huongDiChuyen.x, 0f, huongDiChuyen.z);
-        if (huongNgang.sqrMagnitude < 0.0001f)
-        {
-            huongNgang = transform.forward;
-            huongNgang.y = 0f;
-        }
-        if (huongNgang.sqrMagnitude < 0.0001f) return false;
-        huongNgang.Normalize();
-
-        Vector3 diemBatDau = transform.position + Vector3.up * 0.85f;
-        return BiVatCanChan(diemBatDau, diemBatDau + huongNgang * doDaiTia);
-    }
-
     private bool CoTagVatCan(Transform obj)
     {
         if (string.IsNullOrEmpty(tagVatCan) || tagVatCan == "Untagged") return false;
@@ -396,110 +508,6 @@ public class MeleeEnemyAI : MonoBehaviour
             hienTai = hienTai.parent;
         }
         return false;
-    }
-
-    private bool LaVucThamPhiaTruoc(Vector3 huongDiChuyen)
-    {
-        if (!kiemTraVucTham) return false;
-
-        Vector3 huongNgang = new Vector3(huongDiChuyen.x, 0f, huongDiChuyen.z);
-        if (huongNgang.sqrMagnitude < 0.0001f)
-        {
-            huongNgang = transform.forward;
-            huongNgang.y = 0f;
-        }
-        if (huongNgang.sqrMagnitude < 0.0001f) return false;
-        huongNgang.Normalize();
-
-        Vector3 diemDoPhiaTruoc = transform.position + huongNgang * Mathf.Max(0.4f, khoangCachDoVucTham) + Vector3.up * 0.35f;
-        float doSauKiemTra = Mathf.Max(0.5f, doSauVucTham) + 0.35f;
-
-        bool coMatDat = Physics.Raycast(
-            diemDoPhiaTruoc,
-            Vector3.down,
-            out _,
-            doSauKiemTra,
-            layerMatDat,
-            QueryTriggerInteraction.Ignore
-        );
-
-        if (!coMatDat)
-        {
-            return true;
-        }
-
-        if (dieuHuongNavMesh != null && dieuHuongNavMesh.enabled && dieuHuongNavMesh.isOnNavMesh)
-        {
-            Vector3 diemTrenNavMesh = transform.position + huongNgang * Mathf.Max(0.4f, khoangCachDoVucTham);
-            if (!NavMesh.SamplePosition(diemTrenNavMesh, out _, 0.65f, dieuHuongNavMesh.areaMask))
-            {
-                return true;
-            }
-        }
-
-        return false;
-    }
-
-    private bool TimHuongAnToanTranhVucTham(Vector3 huongHienTai, out Vector3 huongAnToan)
-    {
-        Vector3 huongChuan = new Vector3(huongHienTai.x, 0f, huongHienTai.z);
-        if (huongChuan.sqrMagnitude < 0.0001f)
-        {
-            huongChuan = transform.forward;
-            huongChuan.y = 0f;
-        }
-        huongChuan.Normalize();
-
-        float[] cacGocThu = { 90f, -90f, 135f, -135f, 180f, 45f, -45f };
-        for (int i = 0; i < cacGocThu.Length; i++)
-        {
-            Vector3 huongThu = Quaternion.Euler(0f, cacGocThu[i], 0f) * huongChuan;
-            if (!LaVucThamPhiaTruoc(huongThu) && !CoTuongPhiaTruoc(huongThu))
-            {
-                huongAnToan = huongThu.normalized;
-                return true;
-            }
-        }
-
-        huongAnToan = (-huongChuan).normalized;
-        return false;
-    }
-
-    private bool BiVucThamNganCachVoiPlayer(Vector3 viTriPlayer)
-    {
-        if (!kiemTraVucTham) return false;
-
-        Vector3 huongToiPlayer = viTriPlayer - transform.position;
-        huongToiPlayer.y = 0f;
-        if (huongToiPlayer.sqrMagnitude < 0.01f) return false;
-
-        if (!LaVucThamPhiaTruoc(huongToiPlayer))
-        {
-            return false;
-        }
-
-        Vector3 huongChuan = huongToiPlayer.normalized;
-        Vector3 huongTrai = Quaternion.Euler(0f, -75f, 0f) * huongChuan;
-        Vector3 huongPhai = Quaternion.Euler(0f, 75f, 0f) * huongChuan;
-
-        bool coLoiTrai = !LaVucThamPhiaTruoc(huongTrai);
-        bool coLoiPhai = !LaVucThamPhiaTruoc(huongPhai);
-
-        if (coLoiTrai || coLoiPhai)
-        {
-            return false;
-        }
-
-        if (dieuHuongNavMesh != null && dieuHuongNavMesh.enabled && dieuHuongNavMesh.isOnNavMesh)
-        {
-            NavMeshPath path = new NavMeshPath();
-            if (dieuHuongNavMesh.CalculatePath(viTriPlayer, path) && path.status == NavMeshPathStatus.PathComplete)
-            {
-                return false;
-            }
-        }
-
-        return true;
     }
 
     private void KichHoatBoDiViVucTham()
@@ -578,7 +586,7 @@ public class MeleeEnemyAI : MonoBehaviour
 
         if (mucTieuTotNhat != null)
         {
-            if (BiVucThamNganCachVoiPlayer(mucTieuTotNhat.position))
+            if (boDoDuong != null && boDoDuong.BiVucThamNganCachSangViTri(mucTieuTotNhat.position))
             {
                 KichHoatBoDiViVucTham();
                 return false;
@@ -591,7 +599,6 @@ public class MeleeEnemyAI : MonoBehaviour
         return false;
     }
 
-    // Khi đang truy đuổi: không di chuyển ngẫu nhiên/vòng ngẫu nhiên, chỉ dí thẳng theo người chơi cho tới khi mất dấu
     private Vector3 TinhDiemTruyDuoiTrucTiep(bool coTheThayNgayBayGio)
     {
         if (coTheThayNgayBayGio && mucTieuNguoiChoiHienTai != null)
@@ -612,25 +619,14 @@ public class MeleeEnemyAI : MonoBehaviour
         float goc = Random.Range(-180f, 180f);
         Vector3 huong = Quaternion.Euler(0f, goc, 0f) * Vector3.forward;
         float banKinh = Random.Range(1.5f, Mathf.Max(2f, banKinhTimKiem));
-        Vector3 diemUngVien = viTriNguoiChoiCuoiCung + huong * banKinh;
-
-        if (dieuHuongNavMesh != null && dieuHuongNavMesh.enabled && dieuHuongNavMesh.isOnNavMesh)
-        {
-            if (NavMesh.SamplePosition(diemUngVien, out NavMeshHit navHit, 2.5f, dieuHuongNavMesh.areaMask))
-            {
-                diemTimKiemHienTai = navHit.position;
-                daCoDiemTimKiem = true;
-                return;
-            }
-        }
-
-        diemTimKiemHienTai = diemUngVien;
+        diemTimKiemHienTai = viTriNguoiChoiCuoiCung + huong * banKinh;
         daCoDiemTimKiem = true;
     }
 
     private void XuLyTimKiemKhiMatDau()
     {
-        boDemThoiGianTimKiem -= Time.deltaTime;
+        float dt = LayDeltaTimeAnToan();
+        boDemThoiGianTimKiem -= dt;
         if (boDemThoiGianTimKiem <= 0f)
         {
             daCoDiemTimKiem = false;
@@ -652,7 +648,7 @@ public class MeleeEnemyAI : MonoBehaviour
             daCoDiemTimKiem = true;
         }
 
-        DiChuyenToiViTri(diemTimKiemHienTai);
+        DiChuyenToiViTri(diemTimKiemHienTai, tocDoTuanTra);
         XoayMatVeMucTieu(diemTimKiemHienTai);
 
         if (Vector3.Distance(transform.position, diemTimKiemHienTai) <= 1.2f)
@@ -663,6 +659,14 @@ public class MeleeEnemyAI : MonoBehaviour
 
     private void CapNhatTrangThai(bool coTheThayNgayBayGio)
     {
+        float dt = LayDeltaTimeAnToan();
+
+        if (DangUuTienBoChayLuuDan())
+        {
+            trangThaiHienTai = TrangThaiAI.BoChayLuuDan;
+            return;
+        }
+
         if (daBoDiViVucTham)
         {
             if (laLinhCanh)
@@ -673,7 +677,7 @@ public class MeleeEnemyAI : MonoBehaviour
                     {
                         DungDiChuyen();
                         transform.position = viTriBanDau;
-                        transform.rotation = Quaternion.Slerp(transform.rotation, gocBanDau, tocDoXoayHuong * Time.deltaTime);
+                        transform.rotation = Quaternion.Slerp(transform.rotation, gocBanDau, tocDoXoayHuong * dt);
                         trangThaiHienTai = TrangThaiAI.NghiNgoi;
                     }
                 }
@@ -726,7 +730,7 @@ public class MeleeEnemyAI : MonoBehaviour
         {
             if (trangThaiHienTai == TrangThaiAI.TuanTra)
             {
-                boDemTuanTraMatDau -= Time.deltaTime;
+                boDemTuanTraMatDau -= dt;
                 if (boDemTuanTraMatDau <= 0f)
                 {
                     trangThaiHienTai = TrangThaiAI.VeChoCu;
@@ -738,7 +742,7 @@ public class MeleeEnemyAI : MonoBehaviour
                 {
                     DungDiChuyen();
                     transform.position = viTriBanDau;
-                    transform.rotation = Quaternion.Slerp(transform.rotation, gocBanDau, tocDoXoayHuong * Time.deltaTime);
+                    transform.rotation = Quaternion.Slerp(transform.rotation, gocBanDau, tocDoXoayHuong * dt);
                     trangThaiHienTai = TrangThaiAI.NghiNgoi;
                 }
             }
@@ -754,30 +758,33 @@ public class MeleeEnemyAI : MonoBehaviour
 
     private void ThucThiTrangThai(bool coTheThayNgayBayGio)
     {
+        float dt = LayDeltaTimeAnToan();
+
         switch (trangThaiHienTai)
         {
+            case TrangThaiAI.BoChayLuuDan:
+                XuLyBoChayLuuDan();
+                break;
+
             case TrangThaiAI.NghiNgoi:
                 DungDiChuyen();
                 if (!laLinhCanh)
                 {
-                    boDemThoiGianNghi -= Time.deltaTime;
+                    boDemThoiGianNghi -= dt;
                 }
                 break;
 
             case TrangThaiAI.TuanTra:
-                DatTocDoDiChuyen(tocDoTuanTra);
                 XuLyTuanTra();
                 break;
 
             case TrangThaiAI.TruyDuoi:
-                DatTocDoDiChuyen(tocDoTruyDuoi);
                 Vector3 viTriTruyDuoi = TinhDiemTruyDuoiTrucTiep(coTheThayNgayBayGio);
-                DiChuyenToiViTri(viTriTruyDuoi);
+                DiChuyenToiViTri(viTriTruyDuoi, tocDoTruyDuoi);
                 XoayMatVeMucTieu(viTriTruyDuoi);
                 break;
 
             case TrangThaiAI.TimKiem:
-                DatTocDoDiChuyen(tocDoTuanTra);
                 XuLyTimKiemKhiMatDau();
                 break;
 
@@ -796,8 +803,7 @@ public class MeleeEnemyAI : MonoBehaviour
                 break;
 
             case TrangThaiAI.VeChoCu:
-                DatTocDoDiChuyen(tocDoTuanTra);
-                DiChuyenToiViTri(viTriBanDau);
+                DiChuyenToiViTri(viTriBanDau, tocDoTuanTra);
                 XoayMatVeMucTieu(viTriBanDau);
                 break;
         }
@@ -808,12 +814,6 @@ public class MeleeEnemyAI : MonoBehaviour
         float gocNgauNhien = Random.Range(-180f, 180f);
         huongTuanTraHienTai = Quaternion.Euler(0f, gocNgauNhien, 0f);
         Vector3 huongDi = huongTuanTraHienTai * Vector3.forward;
-
-        if (LaVucThamPhiaTruoc(huongDi) || CoTuongPhiaTruoc(huongDi))
-        {
-            TimHuongAnToanTranhVucTham(huongDi, out huongDi);
-            huongTuanTraHienTai = Quaternion.LookRotation(huongDi, Vector3.up);
-        }
 
         float khoangCach = (cacDiemTuanTra != null && cacDiemTuanTra.Length > 0)
             ? khoangCachBuocTuanTra
@@ -832,15 +832,8 @@ public class MeleeEnemyAI : MonoBehaviour
             Transform diemMoc = cacDiemTuanTra[chiSoDiemTuanTra % cacDiemTuanTra.Length];
             if (diemMoc != null)
             {
-                Vector3 huongMoc = diemMoc.position - transform.position;
-                huongMoc.y = 0f;
-                if (huongMoc.sqrMagnitude > 0.01f)
-                {
-                    huongTuanTraHienTai = Quaternion.LookRotation(huongMoc.normalized, Vector3.up);
-                }
-
-                transform.rotation = Quaternion.Slerp(transform.rotation, huongTuanTraHienTai, tocDoXoayHuong * Time.deltaTime);
-                DiChuyenToiViTri(diemMoc.position);
+                DiChuyenToiViTri(diemMoc.position, tocDoTuanTra);
+                XoayMatVeHuongDiChuyen(diemMoc.position);
 
                 if (Vector3.Distance(transform.position, diemMoc.position) <= 1.1f)
                 {
@@ -857,8 +850,8 @@ public class MeleeEnemyAI : MonoBehaviour
             ChonHuongVaDiemTuanTraMoi(tamTuanTra);
         }
 
-        transform.rotation = Quaternion.Slerp(transform.rotation, huongTuanTraHienTai, tocDoXoayHuong * Time.deltaTime);
-        DiChuyenToiViTri(diemDenTuanTraHienTai);
+        DiChuyenToiViTri(diemDenTuanTraHienTai, tocDoTuanTra);
+        XoayMatVeHuongDiChuyen(diemDenTuanTraHienTai);
 
         if (Vector3.Distance(transform.position, diemDenTuanTraHienTai) <= 1.1f)
         {
@@ -894,22 +887,11 @@ public class MeleeEnemyAI : MonoBehaviour
     {
         if (amThanhBuocChan == null) return;
 
-        bool dangDiChuyen = false;
-        if (dieuHuongNavMesh != null && dieuHuongNavMesh.enabled && dieuHuongNavMesh.isOnNavMesh)
-        {
-            dangDiChuyen = !dieuHuongNavMesh.isStopped && dieuHuongNavMesh.velocity.magnitude > 0.25f;
-        }
-        else
-        {
-            dangDiChuyen = trangThaiHienTai == TrangThaiAI.TuanTra ||
-                           trangThaiHienTai == TrangThaiAI.TruyDuoi ||
-                           trangThaiHienTai == TrangThaiAI.TimKiem ||
-                           trangThaiHienTai == TrangThaiAI.VeChoCu;
-        }
-
+        float dt = LayDeltaTimeAnToan();
+        bool dangDiChuyen = boDoDuong != null && boDoDuong.DangDiChuyen;
         if (dangDiChuyen)
         {
-            boDemBuocChan -= Time.deltaTime;
+            boDemBuocChan -= dt;
             if (boDemBuocChan <= 0f)
             {
                 PhatAmThanh(amThanhBuocChan);
@@ -930,122 +912,45 @@ public class MeleeEnemyAI : MonoBehaviour
         }
     }
 
-    private void DiChuyenToiViTri(Vector3 viTriDich)
+    private void DiChuyenToiViTri(Vector3 viTriDich, float tocDo)
     {
-        Vector3 huongNgang = viTriDich - transform.position;
-        huongNgang.y = 0f;
-
-        if (huongNgang.sqrMagnitude > 0.01f && LaVucThamPhiaTruoc(huongNgang))
+        if (boDoDuong != null)
         {
-            DungDiChuyen();
-
-            if (trangThaiHienTai == TrangThaiAI.TruyDuoi && !TimHuongAnToanTranhVucTham(huongNgang, out _))
-            {
-                KichHoatBoDiViVucTham();
-                return;
-            }
-
-            TimHuongAnToanTranhVucTham(huongNgang, out Vector3 huongAnToan);
-            float khoangCachAnToan = Mathf.Max(2.5f, khoangCachDoVucTham * 2.2f);
-            Vector3 diemAnToan = transform.position + huongAnToan * khoangCachAnToan;
-
-            if (trangThaiHienTai == TrangThaiAI.TuanTra)
-            {
-                diemDenTuanTraHienTai = diemAnToan;
-                huongTuanTraHienTai = Quaternion.LookRotation(huongAnToan, Vector3.up);
-                daCoDiemDenTuanTra = true;
-            }
-            else if (trangThaiHienTai == TrangThaiAI.TimKiem)
-            {
-                diemTimKiemHienTai = diemAnToan;
-                daCoDiemTimKiem = true;
-            }
-
-            XoayMatVeMucTieu(diemAnToan);
-            viTriDich = diemAnToan;
-            huongNgang = huongAnToan;
-        }
-        else if (huongNgang.sqrMagnitude > 0.01f && CoTuongPhiaTruoc(huongNgang))
-        {
-            // Khi đang truy đuổi: không đổi hướng random/vòng ngẫu nhiên, giữ nguyên hướng tới mục tiêu
-            if (trangThaiHienTai != TrangThaiAI.TruyDuoi)
-            {
-                Vector3 huongChuan = huongNgang.normalized;
-                Vector3 huongTrai = Quaternion.Euler(0f, -75f, 0f) * huongChuan;
-                Vector3 huongPhai = Quaternion.Euler(0f, 75f, 0f) * huongChuan;
-                float khoangCachVong = Mathf.Max(doDaiKiemTraTuong + 1.5f, khoangCachVongTuong * 0.7f);
-
-                Vector3 diemVong = huongPhai;
-                if (!CoTuongPhiaTruoc(huongPhai) && !LaVucThamPhiaTruoc(huongPhai))
-                {
-                    diemVong = transform.position + huongPhai * khoangCachVong;
-                }
-                else if (!CoTuongPhiaTruoc(huongTrai) && !LaVucThamPhiaTruoc(huongTrai))
-                {
-                    diemVong = transform.position + huongTrai * khoangCachVong;
-                }
-                else
-                {
-                    TimHuongAnToanTranhVucTham(huongChuan, out Vector3 huongThayThe);
-                    diemVong = transform.position + huongThayThe * khoangCachVong;
-                }
-
-                if (trangThaiHienTai == TrangThaiAI.TuanTra)
-                {
-                    diemDenTuanTraHienTai = diemVong;
-                    daCoDiemDenTuanTra = true;
-                }
-                else if (trangThaiHienTai == TrangThaiAI.TimKiem)
-                {
-                    diemTimKiemHienTai = diemVong;
-                    daCoDiemTimKiem = true;
-                }
-
-                viTriDich = diemVong;
-                huongNgang = viTriDich - transform.position;
-                huongNgang.y = 0f;
-            }
-        }
-
-        if (dieuHuongNavMesh != null && dieuHuongNavMesh.enabled && dieuHuongNavMesh.isOnNavMesh)
-        {
-            dieuHuongNavMesh.isStopped = false;
-            dieuHuongNavMesh.SetDestination(viTriDich);
-        }
-        else
-        {
-            if (huongNgang.sqrMagnitude > 0.01f)
-            {
-                float tocDo = dieuHuongNavMesh != null ? dieuHuongNavMesh.speed : tocDoTuanTra;
-                transform.position += huongNgang.normalized * (tocDo * Time.deltaTime);
-            }
+            boDoDuong.DiChuyenToiDich(viTriDich, tocDo);
         }
     }
 
     private void DungDiChuyen()
     {
-        if (dieuHuongNavMesh != null && dieuHuongNavMesh.enabled && dieuHuongNavMesh.isOnNavMesh)
+        if (boDoDuong != null)
         {
-            dieuHuongNavMesh.isStopped = true;
+            boDoDuong.DungDiChuyen();
         }
     }
 
-    private void DatTocDoDiChuyen(float tocDo)
+    private void XoayMatVeHuongDiChuyen(Vector3 viTriDuPhong)
     {
-        if (dieuHuongNavMesh != null)
-        {
-            dieuHuongNavMesh.speed = tocDo;
-        }
+        float dt = LayDeltaTimeAnToan();
+        Vector3 huong = boDoDuong != null && boDoDuong.DangDiChuyen
+            ? boDoDuong.HuongDiChuyenHienTai
+            : (viTriDuPhong - transform.position);
+
+        huong.y = 0f;
+        if (huong.sqrMagnitude < 0.0001f) return;
+
+        Quaternion gocDich = Quaternion.LookRotation(huong.normalized, Vector3.up);
+        transform.rotation = Quaternion.Slerp(transform.rotation, gocDich, tocDoXoayHuong * dt);
     }
 
     private void XoayMatVeMucTieu(Vector3 viTriMucTieu)
     {
+        float dt = LayDeltaTimeAnToan();
         Vector3 huong = viTriMucTieu - transform.position;
         huong.y = 0f;
         if (huong.sqrMagnitude < 0.0001f) return;
 
         Quaternion gocDich = Quaternion.LookRotation(huong.normalized, Vector3.up);
-        transform.rotation = Quaternion.Slerp(transform.rotation, gocDich, tocDoXoayHuong * Time.deltaTime);
+        transform.rotation = Quaternion.Slerp(transform.rotation, gocDich, tocDoXoayHuong * dt);
     }
 
     private Vector3 LayViTriMat()
@@ -1081,9 +986,6 @@ public class MeleeEnemyAI : MonoBehaviour
         Gizmos.color = Color.yellow;
         Gizmos.DrawRay(viTriMat, bienTrai.normalized * banKinhVe);
         Gizmos.DrawRay(viTriMat, bienPhai.normalized * banKinhVe);
-
-        Gizmos.color = new Color(1f, 0.45f, 0.1f, 0.95f);
-        Gizmos.DrawRay(transform.position + Vector3.up * 0.85f, transform.forward * Mathf.Max(0.1f, doDaiKiemTraTuong));
 
         Gizmos.color = mauVungTamNhin;
         Gizmos.DrawSphere(transform.position, banKinhVe * 0.05f);

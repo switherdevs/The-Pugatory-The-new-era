@@ -539,7 +539,7 @@ MonoBehaviour:
   lopVatCan:
     serializedVersion: 2
     m_Bits: 4294967295
-  kiemTraVatCanCheKhuat: 0
+  kiemTraVatCanCheKhuat: 1
   lucDayVatLy: 12
   flashCanvasObject: {fileID: 0}
   flashImage: {fileID: 0}

@@ -519,9 +519,10 @@ MonoBehaviour:
   heSoSatThuongDau: 2
   heSoTocDoKhiTrungChan: 0.45
   thoiGianLamCham: 2.5
-  choPhepChoangKhiTrungThan: 1
+  choPhepDanChoangKhiTrungThan: 1
+  choPhepChoangKhiTrungDau: 1
   thoiGianChoang: 1.5
-  hieuUngTrungVung: {fileID: 0}
+  prefabHieuUngTrungVung: {fileID: 0}
 --- !u!1 &4577862786097533891
 GameObject:
   m_ObjectHideFlags: 0
@@ -596,9 +597,10 @@ MonoBehaviour:
   heSoSatThuongDau: 2
   heSoTocDoKhiTrungChan: 0.45
   thoiGianLamCham: 2.5
-  choPhepChoangKhiTrungThan: 1
+  choPhepDanChoangKhiTrungThan: 1
+  choPhepChoangKhiTrungDau: 1
   thoiGianChoang: 1.5
-  hieuUngTrungVung: {fileID: 0}
+  prefabHieuUngTrungVung: {fileID: 0}
 --- !u!1 &5385758869426860017
 GameObject:
   m_ObjectHideFlags: 0
@@ -615,6 +617,9 @@ GameObject:
   - component: {fileID: 5436621727485204819}
   - component: {fileID: 7443385535856711110}
   - component: {fileID: 6027578476270795473}
+  - component: {fileID: 9114865017332796394}
+  - component: {fileID: 2774196310239443311}
+  - component: {fileID: 8474381556211253282}
   m_Layer: 11
   m_Name: Enemy_Melete
   m_TagString: Enemy
@@ -764,7 +769,6 @@ MonoBehaviour:
     serializedVersion: 2
     m_Bits: 1024
   tagVatCan: Wall
-  doDaiKiemTraTuong: 3
   banKinhTamNhin: 50
   gocNhin: 110
   gocNhinTren: 35
@@ -774,16 +778,14 @@ MonoBehaviour:
   heSoTangGocDocTruyDuoi: 1.35
   diemDatMat: {fileID: 7537687112345173390}
   thoiGianNhoDau: 3
-  khoangCachVongTuong: 4.5
   thoiGianTimKiemKhiMatDau: 10
   banKinhTimKiem: 6.5
-  kiemTraVucTham: 1
-  layerMatDat:
-    serializedVersion: 2
-    m_Bits: 4294967295
-  khoangCachDoVucTham: 1.35
-  doSauVucTham: 2.5
   boDiKhiBiVucThamChan: 1
+  thoiGianBoChayLuuDan: 2.5
+  khoangCachBoChayLuuDan: 80
+  tocDoBoChayLuuDan: 30
+  banKinhTimChoTronLuuDan: 14
+  khoangCachAnSauVatCan: 1.6
   laLinhCanh: 0
   thoiGianTuanTraKhiMatDau: 5
   cacDiemTuanTra: []
@@ -955,6 +957,91 @@ MonoBehaviour:
   onChet:
     m_PersistentCalls:
       m_Calls: []
+--- !u!114 &9114865017332796394
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 5385758869426860017}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: ed1537b69842c884fad7ba89cd0c8493, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::EnemyAlertSystem
+  banKinhBaoDong: 150
+  layerDongMinh:
+    serializedVersion: 2
+    m_Bits: 2048
+  thoiGianGianCachBaoDong: 2
+  batQuetLuuDan: 1
+  banKinhQuetLuuDan: 60
+  layerLuuDan:
+    serializedVersion: 2
+    m_Bits: 8192
+  tagLuuDan: Grenade
+  tuKhoaTenLuuDan: grenade
+  thoiGianGianCachBaoDongLuuDan: 0.25
+  hienThiGizmos: 1
+--- !u!114 &2774196310239443311
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 5385758869426860017}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 0838c87cde175b646a7cf1d937e670f6, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::CheMatQuaiKhiNupBuiVaChoang
+  batCheMatKhiNupBui: 1
+  khoangCachChamPhuBoSung: 0.25
+  batChoangKhiLuuDanChoangNo: 1
+  thoiGianChoangMacDinh: 3.2
+  banKinhChoangTuyChinh: 20
+  kiemTraVatCanChanChoang: 1
+  lopVatCanChoang:
+    serializedVersion: 2
+    m_Bits: 4096
+  hieuUngLaoDaoKhiChoang: 1
+  gocLaoDaoKhiChoang: 12
+  tocDoLaoDaoKhiChoang: 3
+  tuKhoaLuuDanChoang: flash
+  chuKyQuetScene: 0.35
+  hienThiGizmosChoang: 1
+--- !u!114 &8474381556211253282
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 5385758869426860017}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: af9966a8c78837e418d531f3553c46f6, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::DoDuongRaycastAI
+  doDaiTiaDoDuong: 6
+  banKinhDoVatCan: 0.45
+  gocQuatDoDuong: 150
+  soLuongTiaQuat: 10
+  doCaoPhatTia: 0.85
+  tocDoLamMuonHuong: 10
+  lopVatCan:
+    serializedVersion: 2
+    m_Bits: 0
+  tagVatCan: Wall
+  lopNguoiChoi:
+    serializedVersion: 2
+    m_Bits: 1024
+  kiemTraVucTham: 1
+  lopMatDat:
+    serializedVersion: 2
+    m_Bits: 4294967295
+  khoangCachDoVucTham: 1.35
+  doSauVucTham: 2.5
+  hienThiTiaDoDuong: 1
 --- !u!1 &6738373730334223480
 GameObject:
   m_ObjectHideFlags: 0
@@ -1255,9 +1342,10 @@ MonoBehaviour:
   heSoSatThuongDau: 2
   heSoTocDoKhiTrungChan: 0.45
   thoiGianLamCham: 2.5
-  choPhepChoangKhiTrungThan: 1
+  choPhepDanChoangKhiTrungThan: 1
+  choPhepChoangKhiTrungDau: 1
   thoiGianChoang: 1.5
-  hieuUngTrungVung: {fileID: 0}
+  prefabHieuUngTrungVung: {fileID: 0}
 --- !u!1 &9212641753494150025
 GameObject:
   m_ObjectHideFlags: 0

@@ -310,7 +310,7 @@ GameObject:
   - component: {fileID: -184849473252447302}
   m_Layer: 0
   m_Name: FlashBang prefab
-  m_TagString: Untagged
+  m_TagString: Grenade
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0

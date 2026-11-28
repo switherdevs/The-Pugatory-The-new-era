@@ -234,6 +234,49 @@ public class GrenadeWeapon : MonoBehaviour
     private InputAction HanhDongHuyDangDung =>
         hanhDongHuyNem != null && hanhDongHuyNem.action != null ? hanhDongHuyNem.action : hanhDongHuyTamThoi;
 
+    private void KhoiTaoInputActionsNeuChuaCo()
+    {
+        if (hanhDongNemTamThoi == null)
+        {
+            hanhDongNemTamThoi = new InputAction("GrenadeThrow", InputActionType.Button);
+            hanhDongNemTamThoi.AddBinding("<Mouse>/leftButton");
+            hanhDongNemTamThoi.AddBinding("<Keyboard>/g");
+        }
+
+        if (hanhDongHuyTamThoi == null)
+        {
+            hanhDongHuyTamThoi = new InputAction("GrenadeCancel", InputActionType.Button);
+            hanhDongHuyTamThoi.AddBinding("<Mouse>/rightButton");
+            hanhDongHuyTamThoi.AddBinding("<Keyboard>/r");
+        }
+    }
+
+    private void KichHoatInputActions()
+    {
+        KhoiTaoInputActionsNeuChuaCo();
+
+        if (HanhDongNemDangDung != null && !HanhDongNemDangDung.enabled)
+        {
+            HanhDongNemDangDung.Enable();
+        }
+
+        if (HanhDongHuyDangDung != null && !HanhDongHuyDangDung.enabled)
+        {
+            HanhDongHuyDangDung.Enable();
+        }
+    }
+
+    public void DongBoKhiKichHoatCamTrenTay()
+    {
+        TuDongGanThanhPhan();
+        dangRutChotDonLuc = false;
+        thoiGianDaDonLuc = 0f;
+        enabled = true;
+        LuuTrangThaiGocNghien();
+        TraVeTrangThaiGocNghien(tucThi: true);
+        KichHoatInputActions();
+    }
+
     /// <summary>
     /// Doi Layer cho luu dan khi da duoc nhat len tay (goi sau RefreshWeaponLayer de khong bi ghi de).
     /// </summary>
@@ -424,14 +467,7 @@ public class GrenadeWeapon : MonoBehaviour
         }
 
         LuuTrangThaiGocNghien();
-
-        hanhDongNemTamThoi = new InputAction("GrenadeThrow", InputActionType.Button);
-        hanhDongNemTamThoi.AddBinding("<Mouse>/leftButton");
-        hanhDongNemTamThoi.AddBinding("<Keyboard>/g");
-
-        hanhDongHuyTamThoi = new InputAction("GrenadeCancel", InputActionType.Button);
-        hanhDongHuyTamThoi.AddBinding("<Mouse>/rightButton");
-        hanhDongHuyTamThoi.AddBinding("<Keyboard>/r");
+        KhoiTaoInputActionsNeuChuaCo();
     }
 
     private void Start()
@@ -655,6 +691,7 @@ public class GrenadeWeapon : MonoBehaviour
             daLuuTrangThaiGoc = true;
         }
 
+        KichHoatInputActions();
         ApDungLayerKhiDaNhat();
     }
 
@@ -682,8 +719,7 @@ public class GrenadeWeapon : MonoBehaviour
         TuDongGanThanhPhan();
         LuuTrangThaiGocNghien();
         TraVeTrangThaiGocNghien(tucThi: true);
-        HanhDongNemDangDung?.Enable();
-        HanhDongHuyDangDung?.Enable();
+        KichHoatInputActions();
     }
 
     private void OnDisable()
@@ -719,6 +755,8 @@ public class GrenadeWeapon : MonoBehaviour
             }
             return;
         }
+
+        KichHoatInputActions();
 
         bool vuaNhanNem = HanhDongNemDangDung != null && HanhDongNemDangDung.WasPressedThisFrame();
         bool dangGiuNem = HanhDongNemDangDung != null && HanhDongNemDangDung.IsPressed();

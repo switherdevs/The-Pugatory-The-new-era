@@ -17,7 +17,7 @@ GameObject:
   - component: {fileID: 657491808549330687}
   - component: {fileID: 6284057921839014219}
   - component: {fileID: 612446489821173082}
-  m_Layer: 8
+  m_Layer: 0
   m_Name: Grap_hook
   m_TagString: Untagged
   m_Icon: {fileID: 0}
@@ -419,3 +419,12 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::WeaponLoadoutClassifier
   category: 4
   autoDetectIfUnset: 1
+  requirePickupRadius: 1
+  pickupRadius: 2.5
+  useHorizontalDistanceXZ: 0
+  pickupAnchorOverride: {fileID: 0}
+  drawPickupGizmo: 1
+  autoSwitchLayerOnEquipDrop: 1
+  applyToChildren: 1
+  weaponLayerIndex: -1
+  unheldLayerIndex: 0

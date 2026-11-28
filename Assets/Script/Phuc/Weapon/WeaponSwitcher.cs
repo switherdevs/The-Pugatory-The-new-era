@@ -165,6 +165,14 @@ public class WeaponSwitcher : MonoBehaviour
         if (dropWeaponAction == null && runtimeDropAction != null) runtimeDropAction.Dispose();
     }
 
+    private void DongBoLuuDanTaiSlot(int index)
+    {
+        if (grenadeWeapons != null && index >= 0 && index < grenadeWeapons.Length && grenadeWeapons[index] != null)
+        {
+            grenadeWeapons[index].DongBoKhiKichHoatCamTrenTay();
+        }
+    }
+
     private void Start()
     {
         ArrangeWeaponsIntoClassifiedSlots();
@@ -177,6 +185,7 @@ public class WeaponSwitcher : MonoBehaviour
         if (firstIdx >= 0 && weapons[firstIdx] != null && CoTheChonSlot(firstIdx))
         {
             weapons[firstIdx].SetActive(true);
+            DongBoLuuDanTaiSlot(firstIdx);
             switchCoroutine = StartCoroutine(PlayEquipAnimation(
                 weapons[firstIdx].transform,
                 originalLocalPositions[firstIdx],
@@ -219,6 +228,7 @@ public class WeaponSwitcher : MonoBehaviour
         {
             currentWeaponIndex = targetIndex;
             weapons[targetIndex].SetActive(true);
+            DongBoLuuDanTaiSlot(targetIndex);
             switchCoroutine = StartCoroutine(PlayEquipAnimation(
                 weapons[targetIndex].transform,
                 originalLocalPositions[targetIndex],
@@ -512,6 +522,10 @@ public class WeaponSwitcher : MonoBehaviour
                 Destroy(pickedWeapon);
 
                 weapons[targetIndex].SetActive(existingGrenade.ConLuuDan && (currentWeaponIndex == targetIndex || autoEquipIfGrenade));
+                if (currentWeaponIndex == targetIndex || autoEquipIfGrenade)
+                {
+                    existingGrenade.DongBoKhiKichHoatCamTrenTay();
+                }
                 if (autoEquipIfGrenade && existingGrenade.ConLuuDan && currentWeaponIndex != targetIndex)
                 {
                     StartSwitchToWeapon(targetIndex);
@@ -596,6 +610,7 @@ public class WeaponSwitcher : MonoBehaviour
 
         int previousIndex = currentWeaponIndex;
         currentWeaponIndex = targetIndex;
+        DongBoLuuDanTaiSlot(targetIndex);
 
         if (switchCoroutine != null) StopCoroutine(switchCoroutine);
 
@@ -606,6 +621,7 @@ public class WeaponSwitcher : MonoBehaviour
         else
         {
             pickedWeapon.SetActive(true);
+            DongBoLuuDanTaiSlot(targetIndex);
             switchCoroutine = StartCoroutine(PlayEquipAnimation(
                 pickedWeapon.transform,
                 originalLocalPositions[targetIndex],
@@ -703,6 +719,7 @@ public class WeaponSwitcher : MonoBehaviour
             weapons[currentWeaponIndex].SetActive(true);
             weapons[currentWeaponIndex].transform.localPosition = originalLocalPositions[currentWeaponIndex];
             weapons[currentWeaponIndex].transform.localRotation = originalLocalRotations[currentWeaponIndex];
+            DongBoLuuDanTaiSlot(currentWeaponIndex);
         }
         else
         {
@@ -767,6 +784,7 @@ public class WeaponSwitcher : MonoBehaviour
             weapons[currentWeaponIndex].SetActive(true);
             weapons[currentWeaponIndex].transform.localPosition = originalLocalPositions[currentWeaponIndex];
             weapons[currentWeaponIndex].transform.localRotation = originalLocalRotations[currentWeaponIndex];
+            DongBoLuuDanTaiSlot(currentWeaponIndex);
         }
         else
         {
@@ -951,6 +969,7 @@ public class WeaponSwitcher : MonoBehaviour
             newTrans.localPosition = equipStartPos;
             newTrans.localRotation = equipStartRot;
             newWeapon.SetActive(true);
+            DongBoLuuDanTaiSlot(newIndex);
 
             float elapsedTime = 0f;
             while (elapsedTime < equipDuration)
@@ -967,6 +986,7 @@ public class WeaponSwitcher : MonoBehaviour
 
             newTrans.localPosition = targetPos;
             newTrans.localRotation = targetRot;
+            DongBoLuuDanTaiSlot(newIndex);
         }
 
         isSwitchesInProgress = false;
@@ -997,6 +1017,7 @@ public class WeaponSwitcher : MonoBehaviour
 
         weaponTransform.localPosition = targetPos;
         weaponTransform.localRotation = targetRot;
+        DongBoLuuDanTaiSlot(currentWeaponIndex);
         isSwitchesInProgress = false;
     }
 }
